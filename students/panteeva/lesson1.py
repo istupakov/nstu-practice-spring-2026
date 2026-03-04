@@ -12,7 +12,7 @@ class Exercise:
 
     @staticmethod
     def sum(x: int, y: int) -> int:
-        return x+y
+        return x + y
 
     @staticmethod
     def solve(A: np.ndarray, b: np.ndarray) -> np.ndarray:
