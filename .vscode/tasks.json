@@ -69,7 +69,7 @@
         {
             "label": "open allure",
             "type": "shell",
-            "command": "uv run pytest --alluredir .test_results --clean-alluredir && npx allure open .test_results",
+            "command": "uv run pytest --alluredir .test_results --clean-alluredir; npx allure open .test_results",
             "problemMatcher": [],
             "detail": "Open Allure report"
         }

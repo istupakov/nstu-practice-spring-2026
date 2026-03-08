@@ -1,5 +1,6 @@
 from typing import Protocol, runtime_checkable
 
+import allure
 import numpy as np
 import pytest
 
@@ -20,12 +21,14 @@ def topic() -> str:
     return "Lesson 1"
 
 
+@allure.label("part", "sum")
 def test_sum(assignment_finder: AssignmentFinder):
     assignment = assignment_finder()
     assert isinstance(assignment, Lesson1Assignment)
     assert assignment.sum(2, 2) == 4
 
 
+@allure.label("part", "solve")
 @pytest.mark.parametrize("n", [1, 2, 10])
 def test_solve(assignment_finder: AssignmentFinder, n: int):
     assignment = assignment_finder()

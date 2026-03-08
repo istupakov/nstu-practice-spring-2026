@@ -3,5 +3,6 @@ plugins:
   awesome:
     options:
       groupBy:
-        - topic
         - student
+        - topic
+        - part

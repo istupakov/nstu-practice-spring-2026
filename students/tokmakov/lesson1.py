@@ -4,7 +4,7 @@ import numpy as np
 class Exercise:
     @staticmethod
     def get_student() -> str:
-        return "Пантеева Валентина Ивановна, ПМ-33"
+        return "Токмаков Дмитрий Евгеньевич, ПМ-31"
 
     @staticmethod
     def get_topic() -> str:
@@ -16,4 +16,5 @@ class Exercise:
 
     @staticmethod
     def solve(A: np.ndarray, b: np.ndarray) -> np.ndarray:
-        return np.linalg.solve(A, b)
+        A_invert = np.linalg.inv(A)
+        return A_invert @ b
