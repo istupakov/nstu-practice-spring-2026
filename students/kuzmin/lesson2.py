@@ -20,7 +20,7 @@ class LinearRegression:
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         p = self.predict(x)
-        dw = (-2 / x.shape[0]) * np.dot(x.T, (y - p))
+        dw = (-2 / len(x)) * np.dot(x.T, (y - p))
         db = -2 * np.mean(y - p)
         return dw, db
 
@@ -38,17 +38,16 @@ class LogisticRegression:
         return 1 / np.exp(-z)
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        return -np.sum(y * np.log(self.predict(x)) + (1 - y) * np.log(1 - self.predict(x)))
+        p = self.predict(x)
+        return -np.mean(y * np.log(p) + (1 - y) * np.log(1 - p))
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
         return np.mean((self.predict(x) >= 0.5) == y)
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-
         p = self.predict(x)
-        f = p / (p + 1)
-        db = f * (1 - f)
-        dw = x * db
+        dw = 1 / len(x) * np.dot(x.T, (p - y))
+        db = np.mean(p - y)
         return dw, db
 
 
