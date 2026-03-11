@@ -40,7 +40,7 @@ class LogisticRegression:
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
         p = self.predict(x)
-        return np.sum(-(y * np.log(p) + (1 - y) * np.log(1 - p)))
+        return -1 / y.size * np.sum(y * np.log(p) + (1 - y) * np.log(1 - p))
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
         y_pred = np.where(self.predict(x) >= 0.5, 1, 0)
@@ -49,7 +49,7 @@ class LogisticRegression:
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         p = self.predict(x)
-        return x.T @ (p - y), np.sum(p - y)
+        return (x.T @ (p - y)) / y.size, np.sum(p - y) / y.size
 
 
 class Exercise:
