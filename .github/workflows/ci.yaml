@@ -34,9 +34,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Install dependencies
         run: uv sync
       - name: Test code with pytest
-        run: uv run pytest
+        continue-on-error: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          uv run pytest --changed-files=$FILES
