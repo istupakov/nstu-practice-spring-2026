@@ -13,3 +13,5 @@
 1. https://numpy.org/doc/stable/user/quickstart.html
 2. https://matplotlib.org/stable/tutorials/pyplot.html
 3. https://pandas.pydata.org/docs/user_guide/10min.html
+4. https://ipython.readthedocs.io/en/stable/interactive/magics.html
+5. https://mlu-explain.github.io
