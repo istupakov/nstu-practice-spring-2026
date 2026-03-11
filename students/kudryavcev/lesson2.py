@@ -10,16 +10,20 @@ class LinearRegression:
         self.bias = np.array(0.0)
 
     def predict(self, x: np.ndarray) -> np.ndarray:
-        return np.zeros_like(self.bias)
+        return x @ self.weights + self.bias
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        return 0
+        y_pred = self.predict(x)
+        return float(np.mean((y - y_pred) ** 2))
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        return 0
+        return float(1 - self.loss(x, y) / np.var(y))
 
-    def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        return np.zeros_like(self.weights), np.zeros_like(self.bias)
+    def grad(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        y_pred = self.predict(x)
+        dw = -2 * x.T @ (y - y_pred) / x.shape[0]
+        db = -2 * np.mean(y - y_pred)
+        return dw, db
 
 
 class LogisticRegression:
@@ -31,22 +35,27 @@ class LogisticRegression:
         self.bias = np.array(0.0)
 
     def predict(self, x: np.ndarray) -> np.ndarray:
-        return np.zeros_like(self.bias)
+        z = x @ self.weights + self.bias
+        return 1 / (1 + np.exp(-z))
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        return 0
+        p = np.clip(self.predict(x), 1e-15, 1 - 1e-15)
+        return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
 
-    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
-        return 0
+    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
+        return float(np.mean((self.predict(x) >= 0.5).astype(int) == y))
 
-    def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        return np.zeros_like(self.weights), np.zeros_like(self.bias)
+    def grad(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        p = self.predict(x)
+        dw = x.T @ (p - y) / x.shape[0]
+        db = np.mean(p - y)
+        return dw, db
 
 
 class Exercise:
     @staticmethod
     def get_student() -> str:
-        return "Фамилия Имя Отчество, ПМ-XX"
+        return "Кудрявцев Павел Павлович, ПМ-35"
 
     @staticmethod
     def get_topic() -> str:
@@ -66,11 +75,9 @@ class Exercise:
         x: np.ndarray,
         y: np.ndarray,
         lr: float,
-        n_epoch: int,
-        batch_size: int | None = None,
-    ) -> None: ...
-
-    @staticmethod
-    def get_iris_hyperparameters() -> dict[str, int | float]:
-        # Для 25 эпох, по метрике AUROC
-        return {"lr": 0.42, "batch_size": 42}
+        n_iter: int,
+    ) -> None:
+        for _ in range(n_iter):
+            dw, db = model.grad(x, y)
+            model.weights -= lr * dw
+            model.bias -= lr * db

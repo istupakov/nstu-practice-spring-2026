@@ -26,10 +26,12 @@ jobs:
         with:
           node-version: lts/*
       - name: Install Allure
-        run: npm install -g allure
+        run: npm install -g allure fast-xml-builder
       - name: Test code with pytest
+        continue-on-error: true
         run: uv run pytest --alluredir ./allure-results
       - name: Generate Allure report
+        if: always()
         run: allure generate ./allure-results -o ./allure-report
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4

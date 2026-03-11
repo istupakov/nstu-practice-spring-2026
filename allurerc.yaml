@@ -1,8 +1,9 @@
 name: NSTU Practice Spring 2026
+open: false
 plugins:
   awesome:
     options:
       groupBy:
         - student
         - topic
-        - part
+        - subSuite
