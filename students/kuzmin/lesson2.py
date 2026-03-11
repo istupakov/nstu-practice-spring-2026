@@ -35,7 +35,7 @@ class LogisticRegression:
 
     def predict(self, x: np.ndarray) -> np.ndarray:
         z = np.dot(x, self.weights) + self.bias
-        return 1 / np.exp(-z)
+        return 1 / (1 + np.exp(-z))
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
         p = self.predict(x)
