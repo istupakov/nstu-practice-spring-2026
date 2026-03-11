@@ -20,7 +20,7 @@ class LinearRegression:
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         prediction = self.predict(x)
-        error = prediction - y 
+        error = prediction - y
         gradient_w = (2 * x.T @ error) / len(y)
         gradient_b = 2 * np.mean(error)
         return gradient_w, gradient_b
