@@ -60,12 +60,25 @@ class LogisticRegression:
             if TP + FN == 0:
                 return 0.0
             return TP / (TP + FN)
-        else:  # F1
+        if type == "F1":
             precision = self.metric(x, y, "precision")
             recall = self.metric(x, y, "recall")
             if precision + recall == 0:
                 return 0.0
             return 2 * precision * recall / (precision + recall)
+        else:  # type == Auroc
+            x_arr = []
+            y_arr = []
+            P = (y == 1).sum()
+            N = (y == 0).sum()
+            for threshold in np.linspace(1.0, 0.0, 1000):
+                TP = (p[y == 1] >= threshold).sum()
+                FP = (p[y == 0] >= threshold).sum()
+                TPR = TP / P
+                FPR = FP / N
+                x_arr.append(FPR)
+                y_arr.append(TPR)
+            return np.trapezoid(y_arr, x_arr)
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         p = self.predict(x)
@@ -107,11 +120,6 @@ class Exercise:
                 model.bias -= lr * db
         else:
             for _ in range(n_epoch):
-                # seed = np.random.randint(0, 100)
-                # np.random.seed(seed)
-                # np.random.shuffle(x)
-                # np.random.seed(seed)
-                # np.random.shuffle(y)
                 for i in range(0, len(x), batch_size):
                     dw, db = model.grad(x[i : i + batch_size], y[i : i + batch_size])
                     model.weights -= lr * dw
