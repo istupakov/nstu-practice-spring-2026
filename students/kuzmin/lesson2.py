@@ -41,8 +41,31 @@ class LogisticRegression:
         p = self.predict(x)
         return -np.mean(y * np.log(p) + (1 - y) * np.log(1 - p))
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        return np.mean((self.predict(x) >= 0.5) == y)
+    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
+        threshold = 0.5
+        p = self.predict(x)
+
+        TP = (p[y == 1] >= threshold).sum()
+        FP = (p[y == 0] >= threshold).sum()
+        # TN = (p[y == 0] < threshold).sum()
+        FN = (p[y == 1] < threshold).sum()
+
+        if type == "accuracy":
+            return np.mean((p >= threshold) == y)
+        if type == "precision":
+            if TP + FP == 0:
+                return 0.0
+            return TP / (TP + FP)
+        if type == "recall":
+            if TP + FN == 0:
+                return 0.0
+            return TP / (TP + FN)
+        else:  # F1
+            precision = self.metric(x, y, "precision")
+            recall = self.metric(x, y, "recall")
+            if precision + recall == 0:
+                return 0.0
+            return 2 * precision * recall / (precision + recall)
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         p = self.predict(x)
@@ -69,8 +92,32 @@ class Exercise:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _ in range(n_iter):
-            dw, db = model.grad(x, y)
-            model.weights -= lr * dw
-            model.bias -= lr * db
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int | None = None,
+    ) -> None:
+        if batch_size is None:
+            for _ in range(n_epoch):
+                dw, db = model.grad(x, y)
+                model.weights -= lr * dw
+                model.bias -= lr * db
+        else:
+            for _ in range(n_epoch):
+                # seed = np.random.randint(0, 100)
+                # np.random.seed(seed)
+                # np.random.shuffle(x)
+                # np.random.seed(seed)
+                # np.random.shuffle(y)
+                for i in range(0, len(x), batch_size):
+                    dw, db = model.grad(x[i : i + batch_size], y[i : i + batch_size])
+                    model.weights -= lr * dw
+                    model.bias -= lr * db
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        # Для 25 эпох, по метрике AUROC
+        return {"lr": 0.42, "batch_size": 42}
