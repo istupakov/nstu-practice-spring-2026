@@ -1,3 +1,4 @@
+# from matplotlib.pylab import permutation
 import numpy as np
 
 
@@ -42,10 +43,47 @@ class LogisticRegression:
         p = self.predict(x)
         return -1 / y.size * np.sum(y * np.log(p) + (1 - y) * np.log(1 - p))
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        y_pred = np.where(self.predict(x) >= 0.5, 1, 0)
+    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
+        pred = self.predict(x)
 
-        return np.sum(y_pred == y) / y.size
+        TP, TN, FP, FN = 0, 0, 0, 0
+
+        y_pred = np.where(pred >= 0.5, 1, 0)
+
+        TP = np.sum((y_pred == 1) & (y == 1))
+        TN = np.sum((y_pred == 0) & (y == 0))
+        FP = np.sum((y_pred == 1) & (y == 0))
+        FN = np.sum((y_pred == 0) & (y == 1))
+
+        match type:
+            case "precision":
+                return TP / (TP + FP) if (TP + FP) > 0 else 0.0
+            case "recall":
+                return TP / (TP + FN) if (TP + FN) > 0 else 0.0
+            case "F1":
+                return TP / (TP + 1 / 2 * (FP + FN)) if (TP + FP + FN) > 0 else 0.0
+            case "accuracy":
+                return (TP + TN) / y.size
+            case "AUROC":
+                steps = 10000
+                TPR = np.zeros(steps)
+                FPR = np.zeros(steps)
+
+                threshold = 0
+                for i, threshold in enumerate(np.linspace(1, 0, steps)):
+                    y_pred = np.where(pred >= threshold, 1, 0)
+
+                    TP = np.sum((y_pred == 1) & (y == 1))
+                    TN = np.sum((y_pred == 0) & (y == 0))
+                    FP = np.sum((y_pred == 1) & (y == 0))
+                    FN = np.sum((y_pred == 0) & (y == 1))
+
+                    TPR[i] = TP / (TP + FN)
+                    FPR[i] = FP / (FP + TN)
+
+                return np.trapezoid(TPR, FPR)
+            case _:
+                return (TP + TN) / y.size
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         p = self.predict(x)
@@ -69,9 +107,44 @@ class Exercise:
     def create_logistic_model(num_features: int, rng: np.random.Generator | None = None) -> LogisticRegression:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
+    # @staticmethod
+    # def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int)
+    # -> None:
+    #     for _ in range(n_iter):
+    #         grad_w, grad_b = model.grad(x, y)
+    #         model.weights -= lr * grad_w
+    #         model.bias -= lr * grad_b
+
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _ in range(n_iter):
-            grad_w, grad_b = model.grad(x, y)
-            model.weights -= lr * grad_w
-            model.bias -= lr * grad_b
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int | None = None,
+    ) -> None:
+
+        batch = 0
+        exp_num = x.shape[0]
+        if batch_size is None:
+            batch_size = exp_num
+
+        for _ in range(n_epoch):
+            # ind = np.random.permutation(exp_num)
+
+            # x_shuffle = x[ind]
+            # y_shuffle = y[ind]
+
+            for batch in range(0, exp_num, batch_size):
+                x_batch = x[batch : batch + batch_size]
+                y_batch = y[batch : batch + batch_size]
+
+                grad_w, grad_b = model.grad(x_batch, y_batch)
+                model.weights -= lr * grad_w
+                model.bias -= lr * grad_b
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        # Для 25 эпох, по метрике AUROC
+        return {"lr": 1e-1, "batch_size": 10}
