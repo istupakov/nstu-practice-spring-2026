@@ -19,7 +19,7 @@ class LinearRegression:
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
         pred = self.predict(x)
-        return float(1 - (np.sum((y - pred) ** 2) / np.sum((y - np.mean(y)) ** 2))) 
+        return float(1 - (np.sum((y - pred) ** 2) / np.sum((y - np.mean(y)) ** 2)))
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         pred = self.predict(x)
@@ -47,16 +47,15 @@ class LogisticRegression:
 
     def metric(self, x: np.ndarray, y: np.ndarray, type: str = "precision") -> float:
         pred = self.predict(x)
-        tp = np.sum ((pred == 1) & (y == 1))
-        fp = np.sum ((pred == 1) & (y == 0))
-        fn = np.sum ((pred == 0) & (y == 1))
-        tn = np.sum ((pred == 0) & (y == 0))
+        tp = np.sum((pred == 1) & (y == 1))
+        fp = np.sum((pred == 1) & (y == 0))
+        fn = np.sum((pred == 0) & (y == 1))
         if type == "precision":
-            return tp/(tp+fp) 
+            return tp / (tp + fp)
         if type == "recall":
-            return tp/(tp+fn)
+            return tp / (tp + fn)
         if type == "f1":
-            return tp/(tp + 1/2*(fp+fn))
+            return tp / (tp + 1 / 2 * (fp + fn))
         if type == "auroc":
             ind = np.argsort(pred)[::-1]
             y_sorted = y[ind]
@@ -65,13 +64,13 @@ class LogisticRegression:
             tpr = []
             fpr = []
             for i in range(len(pred)):
-                tp_i = np.sum(y_sorted[:i+1] == 1)
-                fp_i = np.sum(y_sorted[:i+1] == 0)
-            
+                tp_i = np.sum(y_sorted[: i + 1] == 1)
+                fp_i = np.sum(y_sorted[: i + 1] == 0)
+
                 tpr.append(tp_i / total_tp)
                 fpr.append(fp_i / total_tn)
-            
-            return np.trapezoid(tpr,fpr)
+
+            return np.trapezoid(tpr, fpr)
         return 0
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
