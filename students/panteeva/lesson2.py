@@ -10,19 +10,22 @@ class LinearRegression:
         self.bias = np.array(0.0)
 
     def predict(self, x: np.ndarray) -> np.ndarray:
-        return np.matmul(x, self.weights) + self.bias
+        return self.bias + x @ self.weights
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        return np.mean((y - self.predict(x)) ** 2)
+        prediction = self.predict(x)
+        return float(np.mean((y - prediction) ** 2))
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        up_sum = np.sum((y - self.predict(x)) ** 2)
-        lower_sum = np.sum((y - np.mean(y)) ** 2)
-        return 1 - up_sum / lower_sum
+        prediction = self.predict(x)
+        sum1 = np.sum((y - prediction) ** 2)
+        sum2 = np.sum((y - np.mean(y)) ** 2)
+        return 1 - sum1 / sum2
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        grad_weights = 2 / len(y) * np.matmul(x.T, (self.predict(x) - y))
-        grad_bias = 2 / len(y) * np.sum(self.predict(x) - y)
+        prediction = self.predict(x)
+        grad_bias = -2 * np.mean(y - prediction)
+        grad_weights = -2 * np.mean(x.T * (y - prediction), axis=1)
         return grad_weights, grad_bias
 
 
@@ -35,25 +38,31 @@ class LogisticRegression:
         self.bias = np.array(0.0)
 
     def predict(self, x: np.ndarray) -> np.ndarray:
-        return 1 / (1 + np.exp(-(np.matmul(x, (self.weights)) + self.bias)))
+        z = self.bias + x @ self.weights
+        return 1 / (1 + np.exp(-z))
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        p_i = np.clip(self.predict(x), 1e-15, 1 - 1e-15)
-        return -np.mean(y * np.log(p_i) + (1 - y) * np.log(1 - p_i))
+        prediction = self.predict(x)
+        eps = 1e-15
+        prediction = np.clip(prediction, eps, 1 - eps)
+        return np.sum(-(y * np.log(prediction) + (1 - y) * np.log(1 - prediction)))
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        return np.mean((self.predict(x) >= 0.5).astype(int) == y)
+        prediction = self.predict(x)
+        accuracy = (prediction >= 0.5).astype(int)
+        return float(np.mean(accuracy == y))
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        grad_weights = 1 / len(y) * np.matmul(x.T, (self.predict(x) - y))
-        grad_bias = 1 / len(y) * np.sum(self.predict(x) - y)
+        prediction = self.predict(x)
+        grad_bias = np.sum(prediction - y)
+        grad_weights = x.T @ (prediction - y)
         return grad_weights, grad_bias
 
 
 class Exercise:
     @staticmethod
     def get_student() -> str:
-        return "Старицын Марк Вадимович, ПМ-35"
+        return "Пантеева Валентина Ивановна, ПМ-33"
 
     @staticmethod
     def get_topic() -> str:

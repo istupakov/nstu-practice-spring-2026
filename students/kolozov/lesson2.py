@@ -10,19 +10,28 @@ class LinearRegression:
         self.bias = np.array(0.0)
 
     def predict(self, x: np.ndarray) -> np.ndarray:
-        return np.matmul(x, self.weights) + self.bias
+        linear_part = x @ self.weights
+        y_pred = linear_part + self.bias
+        return y_pred
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        return np.mean((y - self.predict(x)) ** 2)
+        y_pred = self.predict(x)
+        errors = y_pred - y
+        squared_errors = errors**2
+        return np.mean(squared_errors)
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        up_sum = np.sum((y - self.predict(x)) ** 2)
-        lower_sum = np.sum((y - np.mean(y)) ** 2)
-        return 1 - up_sum / lower_sum
+        y_pred = self.predict(x)
+        ss_res = np.sum((y - y_pred) ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        return 1 - ss_res / ss_tot
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        grad_weights = 2 / len(y) * np.matmul(x.T, (self.predict(x) - y))
-        grad_bias = 2 / len(y) * np.sum(self.predict(x) - y)
+        n = len(y)
+        y_pred = self.predict(x)
+        error = y_pred - y  # знак противоположен теории, но компенсируется знаком ниже
+        grad_weights = (2 / n) * (x.T @ error)
+        grad_bias = (2 / n) * np.sum(error)
         return grad_weights, grad_bias
 
 
@@ -35,25 +44,37 @@ class LogisticRegression:
         self.bias = np.array(0.0)
 
     def predict(self, x: np.ndarray) -> np.ndarray:
-        return 1 / (1 + np.exp(-(np.matmul(x, (self.weights)) + self.bias)))
+        linear_part = x @ self.weights
+        z = linear_part + self.bias
+        y_pred = 1 / (1 + np.exp(-z))
+        return y_pred
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        p_i = np.clip(self.predict(x), 1e-15, 1 - 1e-15)
-        return -np.mean(y * np.log(p_i) + (1 - y) * np.log(1 - p_i))
+        p = self.predict(x)
+        p = np.clip(p, 1e-15, 1 - 1e-15)  # защита от log(0)
+        term1 = y * np.log(p)
+        term2 = (1 - y) * np.log(1 - p)
+        return -np.sum(term1 + term2)
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        return np.mean((self.predict(x) >= 0.5).astype(int) == y)
+        y_pred = self.predict(x)
+        y_pred_class = (y_pred >= 0.5).astype(int)
+        correct_pred = y_pred_class == y
+        accuracy = np.mean(correct_pred)
+        return accuracy
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        grad_weights = 1 / len(y) * np.matmul(x.T, (self.predict(x) - y))
-        grad_bias = 1 / len(y) * np.sum(self.predict(x) - y)
+        y_pred = self.predict(x)
+        error = y_pred - y
+        grad_weights = x.T @ error
+        grad_bias = np.sum(error)
         return grad_weights, grad_bias
 
 
 class Exercise:
     @staticmethod
     def get_student() -> str:
-        return "Старицын Марк Вадимович, ПМ-35"
+        return "Колосов Константин Николаевич, ПМ-33"
 
     @staticmethod
     def get_topic() -> str:
@@ -69,7 +90,7 @@ class Exercise:
 
     @staticmethod
     def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _ in range(n_iter):
+        for _i in range(n_iter):
             grad_weights, grad_bias = model.grad(x, y)
 
             model.weights -= lr * grad_weights
