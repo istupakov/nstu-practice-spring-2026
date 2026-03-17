@@ -10,16 +10,18 @@ class LinearRegression:
         self.bias = np.array(0.0)
 
     def predict(self, x: np.ndarray) -> np.ndarray:
-        return np.zeros_like(self.bias)
+        return x @ self.weights + self.bias
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        return 0
+        return np.sum(np.square(y - self.predict(x))) / (y.size)
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        return 0
+        return 1 - (np.sum(np.square(y - self.predict(x))) / np.sum(np.square(y - np.sum(y) / y.size)))
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        return np.zeros_like(self.weights), np.zeros_like(self.bias)
+        db = -2 * np.sum(y - self.predict(x)) / y.size
+        dw = -2 * x.T @ (y - self.predict(x)) / y.size
+        return dw, db
 
 
 class LogisticRegression:
@@ -31,22 +33,25 @@ class LogisticRegression:
         self.bias = np.array(0.0)
 
     def predict(self, x: np.ndarray) -> np.ndarray:
-        return np.zeros_like(self.bias)
+        return 1 / (1 + np.exp(-(self.bias + x @ self.weights)))
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        return 0
+        return -np.sum(y * np.log(self.predict(x)) + (1 - y) * np.log(1 - self.predict(x))) / y.size
 
-    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
-        return 0
+    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
+        doorstep = 0.5
+        return np.sum((self.predict(x) >= doorstep).astype(int) == y) / y.size
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        return np.zeros_like(self.weights), np.zeros_like(self.bias)
+        db = np.sum(self.predict(x) - y) / y.size
+        dw = (x.T @ (self.predict(x) - y)) / len(y)
+        return dw, db
 
 
 class Exercise:
     @staticmethod
     def get_student() -> str:
-        return "Фамилия Имя Отчество, ПМ-XX"
+        return "Воробьев Никита Александрович, ПМ-31"
 
     @staticmethod
     def get_topic() -> str:
@@ -61,16 +66,8 @@ class Exercise:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def fit(
-        model: LinearRegression | LogisticRegression,
-        x: np.ndarray,
-        y: np.ndarray,
-        lr: float,
-        n_epoch: int,
-        batch_size: int | None = None,
-    ) -> None: ...
-
-    @staticmethod
-    def get_iris_hyperparameters() -> dict[str, int | float]:
-        # Для 25 эпох, по метрике AUROC
-        return {"lr": 0.42, "batch_size": 42}
+    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
+        for _ in range(n_iter):
+            dw, db = model.grad(x, y)
+            model.weights -= lr * dw
+            model.bias -= lr * db
