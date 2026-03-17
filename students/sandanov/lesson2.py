@@ -49,10 +49,63 @@ class LogisticRegression:
         p = np.clip(p, eps, 1 - eps)
         return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
+    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
         p = self.predict(x)
-        y_pred = (p >= 0.5).astype(float)
-        return float(np.mean(y_pred == y))
+
+        if type == "accuracy":
+            y_pred = (p >= 0.5).astype(float)
+            return float(np.mean(y_pred == y))
+
+        elif type == "precision":
+            y_pred = (p >= 0.5).astype(float)
+            tp = np.sum((y_pred == 1) & (y == 1))
+            fp = np.sum((y_pred == 1) & (y == 0))
+            if tp + fp == 0:
+                return 0
+            return tp / (tp + fp)
+
+        elif type == "F1":
+            y_pred = (p >= 0.5).astype(float)
+            tp = np.sum((y_pred == 1) & (y == 1))
+            fn = np.sum((y_pred == 0) & (y == 1))
+            fp = np.sum((y_pred == 1) & (y == 0))
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            if precision + recall == 0:
+                return 0
+            return (2 * precision * recall) / (precision + recall)
+
+        elif type == "recall":
+            y_pred = (p >= 0.5).astype(float)
+            tp = np.sum((y_pred == 1) & (y == 1))
+            fn = np.sum((y_pred == 0) & (y == 1))
+            if tp + fn == 0:
+                return 0
+            return tp / (tp + fn)
+
+        elif type == "AUROC":
+            sort = np.argsort(p)[::-1]
+            y_sort = y[sort]
+
+            pos = np.sum(y == 1)
+            neg = np.sum(y == 0)
+
+            if pos == 0 or neg == 0:
+                return 0.5
+
+            tp = np.cumsum(y_sort == 1)
+            fp = np.cumsum(y_sort == 0)
+
+            tpr = tp / pos
+            fpr = fp / neg
+
+            tpr = np.concatenate(([0.0], tpr, [1.0]))
+            fpr = np.concatenate(([0.0], fpr, [1.0]))
+
+            return float(np.trapezoid(tpr, fpr))
+
+        else:
+            return 0
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         p = self.predict(x)
@@ -80,8 +133,34 @@ class Exercise:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _ in range(n_iter):
-            grad_w, grad_b = model.grad(x, y)
-            model.weights -= lr * grad_w
-            model.bias -= lr * grad_b
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int | None = None,
+    ) -> None:
+
+        n_samples = x.shape[0]
+
+        if batch_size is None:
+            batch_size = n_samples
+
+        iters = int(x.shape[0] / batch_size)
+
+        for epoch in range(n_epoch):
+            epoch * 1
+            for i in range(0, iters * batch_size, batch_size):
+                x_b = x[i : i + batch_size]
+                y_b = y[i : i + batch_size]
+
+                gW, gB = model.grad(x_b, y_b)
+
+                model.weights -= lr * gW
+                model.bias -= lr * gB
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        # Для 25 эпох, по метрике AUROC
+        return {"lr": 1e-1, "batch_size": 5}
