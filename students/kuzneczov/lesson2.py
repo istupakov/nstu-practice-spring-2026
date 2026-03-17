@@ -19,8 +19,6 @@ class LinearRegression:
         return 1 - np.sum((y - self.predict(x)) ** 2) / np.sum((y - np.mean(y)) ** 2)
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        weightsGrad = np.ndarray(self.weights.size)
-        biasGrad = np.ndarray(self.bias.size)
         weightsGrad = -2 * ((y - self.predict(x)) @ x) / x.shape[0]
         biasGrad = -2 * np.mean(y - self.predict(x))
         return weightsGrad, biasGrad
@@ -51,11 +49,9 @@ class LogisticRegression:
         return count / y.size
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        weightsGrad = np.ndarray(self.weights.size)
-        biasGrad = np.ndarray(self.bias.size)
         predict = self.predict(x)
-        biasGrad = np.sum(predict - y) / x.shape[0]
-        weightsGrad = np.sum((predict - y) @ x) / x.shape[0]
+        biasGrad = (np.sum(predict - y)) / y.size
+        weightsGrad = ((predict - y) @ x) / y.size
         return weightsGrad, biasGrad
 
 
@@ -77,10 +73,24 @@ class Exercise:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _i in range(n_iter):
-            weightsGrad = np.ndarray(model.weights.size)
-            biasGrad = np.ndarray(model.bias.size)
-            weightsGrad, biasGrad = model.grad(x, y)
-            model.weights -= weightsGrad * lr
-            model.bias -= biasGrad * lr
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int | None = None,
+    ) -> None:     
+        if batch_size is None:
+            batch_size = x.shape[0]
+        for _i in range(n_epoch):
+            n = int(x.shape[0] / batch_size)
+            for _j in range(n):
+                weightsGrad, biasGrad = model.grad(x, y)
+                model.weights -= weightsGrad * lr
+                model.bias -= biasGrad * lr
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        # Для 25 эпох, по метрике AUROC
+        return {"lr": 0.42, "batch_size": 42}
