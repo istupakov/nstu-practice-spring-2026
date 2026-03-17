@@ -17,6 +17,34 @@ class LinearRegression:
         mse = np.mean((pred - y) ** 2)
         return float(mse)
 
+    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
+        pred = self.predict(x)
+        return float(1 - (np.sum((y - pred) ** 2) / np.sum((y - np.mean(y)) ** 2))) 
+
+    def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
+        pred = self.predict(x)
+        n = len(x)
+        dw = -2 / n * (x.T @ (y - pred))
+        db = -2 / n * np.sum(y - pred)
+        return dw, db
+
+
+class LogisticRegression:
+    weights: np.ndarray
+    bias: np.ndarray
+
+    def __init__(self, num_features: int, rng: np.random.Generator) -> None:
+        self.weights = rng.random(num_features)
+        self.bias = np.array(0.0)
+
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        z = x @ self.weights + self.bias
+        return 1 / (1 + np.exp(-z))
+
+    def loss(self, x: np.ndarray, y: np.ndarray) -> float:
+        pred = self.predict(x)
+        return float(np.mean(-y * np.log(pred) - (1 - y) * np.log(1 - pred)))
+
     def metric(self, x: np.ndarray, y: np.ndarray, type: str = "precision") -> float:
         pred = self.predict(x)
         tp = np.sum ((pred == 1) & (y == 1))
@@ -44,34 +72,7 @@ class LinearRegression:
                 fpr.append(fp_i / total_tn)
             
             return np.trapezoid(tpr,fpr)
-
-    def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        pred = self.predict(x)
-        n = len(x)
-        dw = -2 / n * (x.T @ (y - pred))
-        db = -2 / n * np.sum(y - pred)
-        return dw, db
-
-
-class LogisticRegression:
-    weights: np.ndarray
-    bias: np.ndarray
-
-    def __init__(self, num_features: int, rng: np.random.Generator) -> None:
-        self.weights = rng.random(num_features)
-        self.bias = np.array(0.0)
-
-    def predict(self, x: np.ndarray) -> np.ndarray:
-        z = x @ self.weights + self.bias
-        return 1 / (1 + np.exp(-z))
-
-    def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        pred = self.predict(x)
-        return float(np.mean(-y * np.log(pred) - (1 - y) * np.log(1 - pred)))
-
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        pred = self.predict(x)
-        return np.mean((pred >= 0.5).astype(int) == y)
+        return 0
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         pred = self.predict(x)
