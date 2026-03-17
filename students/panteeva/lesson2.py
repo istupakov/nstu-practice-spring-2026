@@ -53,25 +53,25 @@ class LogisticRegression:
         TP = np.sum((bool_prediction == 1) & (y == 1))
         FP = np.sum((bool_prediction == 1) & (y == 0))
         FN = np.sum((bool_prediction == 0) & (y == 1))
-        #TN = np.sum((bool_prediction == 0) & (y == 0))
+        # TN = np.sum((bool_prediction == 0) & (y == 0))
         if type == "accuracy":
             return float(np.mean((prediction >= 0.5) == y))
         elif type == "precision":
             if TP + FP == 0:
                 return 0.0
             else:
-                return TP/(TP + FP)
+                return TP / (TP + FP)
         elif type == "recall":
             if TP + FN == 0:
                 return 0.0
             else:
-                return TP/(TP + FN)
+                return TP / (TP + FN)
         elif type == "F1":
             if TP + 0.5 * (FP + FN) == 0:
                 return 0.0
             else:
-                return TP/(TP + 0.5 * (FP + FN))
-        else: #type == "AUROC"
+                return TP / (TP + 0.5 * (FP + FN))
+        else:  # type == "AUROC"
             pos_scores = prediction[y == 1]
             neg_scores = prediction[y == 0]
 
@@ -83,7 +83,7 @@ class LogisticRegression:
             correct_pairs = np.sum(pos_scores[:, None] > neg_scores[None, :])
             tie_pairs = np.sum(pos_scores[:, None] == neg_scores[None, :])
 
-            return (correct_pairs + 0.5 * tie_pairs)/(total_neg * total_pos)         
+            return (correct_pairs + 0.5 * tie_pairs) / (total_neg * total_pos)
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         prediction = self.predict(x)
@@ -127,8 +127,8 @@ class Exercise:
         else:
             for _ in range(n_epoch):
                 for start in range(0, x.shape[0], batch_size):
-                    x_batch = x[start: start + batch_size]
-                    y_batch = y[start: start + batch_size]
+                    x_batch = x[start : start + batch_size]
+                    y_batch = y[start : start + batch_size]
                     grad_weights, grad_bias = model.grad(x_batch, y_batch)
 
                     model.weights -= lr * grad_weights
@@ -137,4 +137,4 @@ class Exercise:
     @staticmethod
     def get_iris_hyperparameters() -> dict[str, int | float]:
         # Для 25 эпох, по метрике AUROC
-        return {"lr": 0.001, "batch_size": 4}        
+        return {"lr": 0.001, "batch_size": 4}
