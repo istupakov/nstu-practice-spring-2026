@@ -14,12 +14,12 @@ class LinearRegression:
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
         residuals = y - self.predict(x)
-        return float(np.mean(residuals**2))
+        return float(np.mean(residuals ** 2))
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
         residuals = y - self.predict(x)
         total = y - np.mean(y)
-        return float(1 - np.sum(residuals**2) / np.sum(total**2))
+        return float(1 - np.sum(residuals ** 2) / np.sum(total ** 2))
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         residuals = self.predict(x) - y
@@ -45,9 +45,44 @@ class LogisticRegression:
         p = np.clip(self.predict(x), 1e-15, 1 - 1e-15)
         return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        predictions = (self.predict(x) >= 0.5).astype(int)
-        return float(np.mean(predictions == y))
+    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
+        p = self.predict(x)
+        pred = (p >= 0.5).astype(int)
+
+        tp = np.sum((pred == 1) & (y == 1))
+        fp = np.sum((pred == 1) & (y == 0))
+        tn = np.sum((pred == 0) & (y == 0))
+        fn = np.sum((pred == 0) & (y == 1))
+
+        if type == "accuracy":
+            return float((tp + tn) / (tp + tn + fp + fn)) if (tp + tn + fp + fn) > 0 else 0.0
+
+        elif type == "precision":
+            return float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0
+
+        elif type == "recall":
+            return float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
+
+        elif type == "F1":
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            return float(2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+
+        elif type == "AUROC":
+            pos_scores = p[y == 1]
+            neg_scores = p[y == 0]
+            n_pos = len(pos_scores)
+            n_neg = len(neg_scores)
+            if n_pos == 0 or n_neg == 0:
+                return 0.5
+            pos_col = pos_scores[:, np.newaxis]
+            neg_row = neg_scores[np.newaxis, :]
+            correct = np.sum(pos_col > neg_row)
+            ties = np.sum(pos_col == neg_row)
+            return float((correct + 0.5 * ties) / (n_pos * n_neg))
+
+        else:
+            raise ValueError(f"Unknown metric type: {type}")
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         residuals = self.predict(x) - y
@@ -75,8 +110,28 @@ class Exercise:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _ in range(n_iter):
-            grad_w, grad_b = model.grad(x, y)
-            model.weights = model.weights - lr * grad_w
-            model.bias = model.bias - lr * grad_b
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int | None = None,
+    ) -> None:
+        n_samples = x.shape[0]
+        for _ in range(n_epoch):
+            if batch_size is None:
+                grad_w, grad_b = model.grad(x, y)
+                model.weights = model.weights - lr * grad_w
+                model.bias = model.bias - lr * grad_b
+            else:
+                for start in range(0, n_samples, batch_size):
+                    x_batch = x[start:start + batch_size]
+                    y_batch = y[start:start + batch_size]
+                    grad_w, grad_b = model.grad(x_batch, y_batch)
+                    model.weights = model.weights - lr * grad_w
+                    model.bias = model.bias - lr * grad_b
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        return {"lr": 0.01, "batch_size": 8}
