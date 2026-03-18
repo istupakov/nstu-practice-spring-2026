@@ -16,8 +16,7 @@ class LinearRegression:
         return float(np.mean((self.predict(x) - y) ** 2))
 
     def metric(self, x: np.ndarray, y: np.ndarray, type: str | None = None) -> float:
-        # Для линейной регрессии обычно один тип метрики (R^2),
-        # но параметр type должен быть в сигнатуре для тестов.
+
         y_hat = self.predict(x)
         rss = np.sum((y - y_hat) ** 2)
         tss = np.sum((y - np.mean(y)) ** 2)
@@ -46,8 +45,6 @@ class LogisticRegression:
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
         p = np.clip(self.predict(x), 1e-15, 1 - 1e-15)
         return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
-
-    # --- Методы для отдельных метрик ---
 
     def accuracy(self, x: np.ndarray, y: np.ndarray) -> float:
         y_hat = (self.predict(x) >= 0.5).astype(int)
@@ -80,7 +77,6 @@ class LogisticRegression:
         rank_sum_pos = np.sum(np.where(y[ranked_indices] == 1)[0] + 1)
         return float((rank_sum_pos - pos_count * (pos_count + 1) / 2) / (pos_count * neg_count))
 
-    # --- Метод-диспетчер для тестов ---
     def metric(self, x: np.ndarray, y: np.ndarray, type: str | None = None) -> float:
         if type == "precision":
             return self.precision(x, y)
@@ -93,7 +89,6 @@ class LogisticRegression:
         if type == "accuracy":
             return self.accuracy(x, y)
 
-        # По умолчанию (если type=None) возвращаем accuracy
         return self.accuracy(x, y)
 
     def grad(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
