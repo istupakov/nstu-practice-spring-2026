@@ -40,13 +40,56 @@ class LogisticRegression:
         predict = self.predict(x)
         return -np.mean(y * np.log(predict) + (1 - y) * np.log(1 - predict))
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        predict = self.predict(x)
-        count = 0
-        for i in range(y.size):
-            if y[i] == 1 and predict[i] >= 0.5 or y[i] == 0 and predict[i] < 0.5:
-                count += 1
-        return count / y.size
+    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
+        match type:
+            case "accuracy":
+                predict = self.predict(x)
+                predict = predict >= 0.5
+                return np.sum(y == predict) / y.size
+            case "precision":
+                predict = self.predict(x)
+                predict = predict >= 0.5
+                TP = np.sum((y == 1) & (predict == 1))
+                FP = np.sum((y == 0) & (predict == 1))
+                if TP + FP == 0:
+                    return 0
+                return TP / (TP + FP)
+            case "recall":
+                predict = self.predict(x)
+                predict = predict >= 0.5
+                TP = np.sum((y == 1) & (predict == 1))
+                FN = np.sum((y == 1) & (predict == 0))
+                if TP + FN == 0:
+                    return 0
+                return TP / (TP + FN)
+            case "F1":
+                predict = self.predict(x)
+                predict = predict >= 0.5
+                TP = np.sum((y == 1) & (predict == 1))
+                FP = np.sum((y == 0) & (predict == 1))
+                FN = np.sum((y == 1) & (predict == 0))
+                if TP + FP + FN == 0:
+                    return 0
+                return TP / (TP + 0.5 * (FP + FN))
+            case "AUROC":
+                n = 10000
+                h = 1 / n
+                xc = np.zeros(n)
+                yc = np.zeros(n)
+                predict = self.predict(x)
+                for i, threshold in enumerate(np.linspace(1, 0, n)):
+                    threshold = 1 - i * h
+                    pred = predict >= threshold
+                    TP = np.sum((y == 1) & (pred == 1))
+                    FN = np.sum((y == 1) & (pred == 0))
+                    FP = np.sum((y == 0) & (pred == 1))
+                    TN = np.sum((y == 0) & (pred == 0))
+                    TPR = TP / (TP + FN) if (TP + FN) > 0 else 0
+                    FPR = FP / (FP + TN) if (FP + TN) > 0 else 0
+                    xc[i] = FPR
+                    yc[i] = TPR
+                return np.trapezoid(yc, xc)
+        return 0.0
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         predict = self.predict(x)
@@ -80,17 +123,16 @@ class Exercise:
         lr: float,
         n_epoch: int,
         batch_size: int | None = None,
-    ) -> None:     
+    ) -> None:
         if batch_size is None:
             batch_size = x.shape[0]
         for _i in range(n_epoch):
-            n = int(x.shape[0] / batch_size)
-            for _j in range(n):
-                weightsGrad, biasGrad = model.grad(x, y)
+            for _j in range(0, x.shape[0], batch_size):
+                weightsGrad, biasGrad = model.grad(x[_j : _j + batch_size], y[_j : _j + batch_size])
                 model.weights -= weightsGrad * lr
                 model.bias -= biasGrad * lr
 
     @staticmethod
     def get_iris_hyperparameters() -> dict[str, int | float]:
         # Для 25 эпох, по метрике AUROC
-        return {"lr": 0.42, "batch_size": 42}
+        return {"lr": 0.1, "batch_size": 7}
