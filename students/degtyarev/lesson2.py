@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class LinearRegression:
     weights: np.ndarray
     bias: np.ndarray
@@ -15,7 +16,7 @@ class LinearRegression:
         return float(np.mean((self.predict(x) - y) ** 2))
 
     def metric(self, x: np.ndarray, y: np.ndarray, type: str | None = None) -> float:
-        # Для линейной регрессии обычно один тип метрики (R^2), 
+        # Для линейной регрессии обычно один тип метрики (R^2),
         # но параметр type должен быть в сигнатуре для тестов.
         y_hat = self.predict(x)
         rss = np.sum((y - y_hat) ** 2)
@@ -73,7 +74,8 @@ class LogisticRegression:
         probs = self.predict(x)
         pos_count = np.sum(y == 1)
         neg_count = np.sum(y == 0)
-        if pos_count == 0 or neg_count == 0: return 0.5
+        if pos_count == 0 or neg_count == 0:
+            return 0.5
         ranked_indices = np.argsort(probs)
         rank_sum_pos = np.sum(np.where(y[ranked_indices] == 1)[0] + 1)
         return float((rank_sum_pos - pos_count * (pos_count + 1) / 2) / (pos_count * neg_count))
@@ -90,7 +92,7 @@ class LogisticRegression:
             return self.auroc(x, y)
         if type == "accuracy":
             return self.accuracy(x, y)
-        
+
         # По умолчанию (если type=None) возвращаем accuracy
         return self.accuracy(x, y)
 
@@ -135,8 +137,9 @@ class Exercise:
             for i in range(0, n, bs):
                 x_batch = x[i : i + bs]
                 y_batch = y[i : i + bs]
-                if len(x_batch) == 0: continue
-                
+                if len(x_batch) == 0:
+                    continue
+
                 dw, db = model.grad(x_batch, y_batch)
                 model.weights -= lr * dw
                 model.bias -= lr * db
