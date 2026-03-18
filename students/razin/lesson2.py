@@ -54,7 +54,6 @@ class LogisticRegression:
         n = len(y)
         predictions = self.predict(x)
 
-        # Заменяем 0 и 1 на безопасные значения
         eps = 1e-15
         predictions = np.where(predictions == 0, eps, predictions)
         predictions = np.where(predictions == 1, 1 - eps, predictions)
@@ -65,11 +64,57 @@ class LogisticRegression:
 
         return loss_value
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
+    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
         predictions = self.predict(x)
         pred_classes = predictions >= 0.5
-        correct = np.sum(pred_classes == y)
-        return correct / len(y)
+
+        # Матрица ошибок
+        tp = np.sum((pred_classes == 1) & (y == 1))
+        fp = np.sum((pred_classes == 1) & (y == 0))
+        tn = np.sum((pred_classes == 0) & (y == 0))
+        fn = np.sum((pred_classes == 0) & (y == 1))
+
+        if type == "accuracy":
+            # (TP + TN) / (TP + TN + FP + FN)
+            return (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
+
+        elif type == "precision":
+            # TP / (TP + FP)
+            return tp / (tp + fp) if (tp + fp) > 0 else 0.0
+
+        elif type == "recall":
+            # TP / (TP + FN)
+            return tp / (tp + fn) if (tp + fn) > 0 else 0.0
+
+        elif type == "F1":
+            # 2 * (precision * recall) / (precision + recall)
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            return 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+
+        elif type == "AUROC":
+            # Разделяем на положительные и отрицательные
+            pos_scores = predictions[y == 1]
+            neg_scores = predictions[y == 0]
+
+            n_pos = len(pos_scores)
+            n_neg = len(neg_scores)
+
+            if n_pos == 0 or n_neg == 0:
+                return 0.5
+
+            # Считаем количество пар, где положительный > отрицательный
+            pos_scores_col = pos_scores[:, np.newaxis]  # столбец
+            neg_scores_row = neg_scores[np.newaxis, :]  # строка
+
+            correct_pairs = np.sum(pos_scores_col > neg_scores_row)
+            tie_pairs = np.sum(pos_scores_col == neg_scores_row)
+
+            auroc = (correct_pairs + 0.5 * tie_pairs) / (n_pos * n_neg)
+            return auroc
+
+        else:
+            raise ValueError(f"Unknown metric type: {type}")
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         n = len(y)
@@ -100,11 +145,38 @@ class Exercise:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _i in range(n_iter):
-            # Вычисляем градиенты
-            grad_w, grad_b = model.grad(x, y)
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int | None = None,
+    ) -> None:
 
-            # Обновляем параметры модели
-            model.weights = model.weights - lr * grad_w
-            model.bias = model.bias - lr * grad_b
+        n_samples = x.shape[0]
+
+        for _ in range(n_epoch):
+            # градиентный спуск
+            if batch_size is None:
+                grad_w, grad_b = model.grad(x, y)
+                model.weights -= lr * grad_w
+                model.bias -= lr * grad_b
+
+            # Градиентный спуск с батчами
+            else:
+                for start in range(0, n_samples, batch_size):
+                    end = start + batch_size
+
+                    x_batch = x[start:end]
+                    y_batch = y[start:end]
+
+                    grad_w, grad_b = model.grad(x_batch, y_batch)
+
+                    model.weights -= lr * grad_w
+                    model.bias -= lr * grad_b
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        # Для 25 эпох, по метрике AUROC
+        return {"lr": 0.009, "batch_size": 4}
