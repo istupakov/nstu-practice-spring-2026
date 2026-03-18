@@ -38,9 +38,29 @@ class LogisticRegression:
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
         return -np.sum(y * np.log(self.predict(x)) + (1 - y) * np.log(1 - self.predict(x))) / y.size
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
+    def metric(self, x: np.ndarray, y: np.ndarray, str="accuracy") -> float:
         doorstep = 0.5
-        return np.sum((self.predict(x) >= doorstep).astype(int) == y) / y.size
+        pred = self.predict(x)
+        pred1 = self.predict(x) >= doorstep
+        TP = np.sum((pred1 == 1) & (y == 1))
+        FP = np.sum((pred1 == 1) & (y == 0))
+        FN = np.sum((pred1 == 0) & (y == 1))
+        TN = np.sum((pred1 == 0) & (y == 0))
+        if str == "accuracy":
+            metric = (TP + TN) / (TP + FP + TN + FN) if ((TP + FP + TN + FN) != 0) else 0
+        if str == "precision":
+            metric = TP / (TP + FP) if ((TP + FP) != 0) else 0
+        if str == "recall":
+            metric = TP / (TP + FN) if ((TP + FN) != 0) else 0
+        if str == "F1":
+            metric = TP / (TP + (FP + FN) / 2) if ((TP + (FP + FN) / 2) != 0) else 0
+        if str == "AUROC":
+            pos = pred[y == 1]
+            neg = pred[y == 0]
+            score = pos[:, None] > neg[None, :]
+            metric = np.sum(score) / (len(pos) * len(neg)) if (len(pos) * len(neg) != 0) else 0
+
+        return metric
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         db = np.sum(self.predict(x) - y) / y.size
@@ -66,8 +86,30 @@ class Exercise:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _ in range(n_iter):
-            dw, db = model.grad(x, y)
-            model.weights -= lr * dw
-            model.bias -= lr * db
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int | None = None,
+    ) -> None:
+        if batch_size is None or batch_size <= 0:
+            for _ in range(n_epoch):
+                dw, db = model.grad(x, y)
+                model.weights -= lr * dw
+                model.bias -= lr * db
+
+        else:
+            for _ in range(n_epoch):
+                for i in range(0, x.shape[0], batch_size):
+                    x1 = x[i : i + batch_size]
+                    y1 = y[i : i + batch_size]
+                    dw, db = model.grad(x1, y1)
+                    model.weights -= lr * dw
+                    model.bias -= lr * db
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        # Для 25 эпох, по метрике AUROC
+        return {"lr": 0.001, "batch_size": 25}
