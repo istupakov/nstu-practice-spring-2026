@@ -13,16 +13,19 @@ class LinearRegression:
         return x @ self.weights + self.bias
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        y_pred = self.predict(x)
-        return float(np.mean((y - y_pred) ** 2))
+        ost = y - self.predict(x)
+        return np.mean(ost**2)
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        return float(1 - self.loss(x, y) / np.var(y))
+        ss_res = np.sum((y - self.predict(x)) ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        return 1 - ss_res / ss_tot
 
     def grad(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        y_pred = self.predict(x)
-        dw = -2 * x.T @ (y - y_pred) / x.shape[0]
-        db = -2 * np.mean(y - y_pred)
+        errors = y - self.predict(x)
+        n = x.shape[0]
+        dw = (-2 / n) * x.T @ errors
+        db = (-2 / n) * np.sum(errors)
         return dw, db
 
 
@@ -35,54 +38,65 @@ class LogisticRegression:
         self.bias = np.array(0.0)
 
     def predict(self, x: np.ndarray) -> np.ndarray:
-        z = x @ self.weights + self.bias
-        return 1 / (1 + np.exp(-z))
+        st = x @ self.weights + self.bias
+        sigmoid = 1 / (1 + np.exp(-st))
+        return sigmoid
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        p = np.clip(self.predict(x), 1e-15, 1 - 1e-15)
-        return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
+        eps = 1e-12
+        pred = np.clip(self.predict(x), eps, 1 - eps)
+        return -np.mean(y * np.log(pred) + (1 - y) * np.log(1 - pred))
 
     def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
-        p = self.predict(x)
-        y_pred = (p >= 0.5).astype(int)
+        pred_prob = self.predict(x)
+        pred = pred_prob >= 0.5
+
+        tp = np.sum((pred == 1) & (y == 1))
+        fp = np.sum((pred == 1) & (y == 0))
+        tn = np.sum((pred == 0) & (y == 0))
+        fn = np.sum((pred == 0) & (y == 1))
 
         if type == "accuracy":
-            return float(np.mean(y_pred == y))
-
-        tp = float(np.sum((y_pred == 1) & (y == 1)))
-        # tn = float(np.sum((y_pred == 0) & (y == 0)))
-        fp = float(np.sum((y_pred == 1) & (y == 0)))
-        fn = float(np.sum((y_pred == 0) & (y == 1)))
-
+            return (tp + tn) / (tp + tn + fp + fn)
         if type == "precision":
-            return tp / (tp + fp) if tp + fp > 0 else 0.0
-        elif type == "recall":
-            return tp / (tp + fn) if tp + fn > 0 else 0.0
-        elif type == "F1":
-            precision = tp / (tp + fp) if tp + fp > 0 else 0.0
-            recall = tp / (tp + fn) if tp + fn > 0 else 0.0
-            return 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
-        elif type == "AUROC":
-            pos_scores = p[y == 1]
-            neg_scores = p[y == 0]
-            if len(pos_scores) == 0 or len(neg_scores) == 0:
+            if tp + fp == 0:
+                return 0.0
+            return tp / (tp + fp)
+        if type == "recall":
+            if tp + fn == 0:
+                return 0.0
+            return tp / (tp + fn)
+        if type == "F1":
+            precision = self.metric(x, y, "precision")
+            recall = self.metric(x, y, "recall")
+            if precision + recall == 0:
+                return 0.0
+            return 2 * precision * recall / (precision + recall)
+        if type == "AUROC":
+            pos = pred_prob[y == 1]
+            neg = pred_prob[y == 0]
+
+            if len(pos) == 0 or len(neg) == 0:
                 return 0.5
-            correct_pairs = np.sum(pos_scores[:, np.newaxis] > neg_scores[np.newaxis, :])
-            tie_pairs = np.sum(pos_scores[:, np.newaxis] == neg_scores[np.newaxis, :])
-            return float((correct_pairs + 0.5 * tie_pairs) / (len(pos_scores) * len(neg_scores)))
+
+            good_pairs = np.sum(pos[:, None] > neg[None, :])
+            equal_pairs = np.sum(pos[:, None] == neg[None, :])
+            return (good_pairs + 0.5 * equal_pairs) / (len(pos) * len(neg))
+
         return 0.0
 
     def grad(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        p = self.predict(x)
-        dw = x.T @ (p - y) / x.shape[0]
-        db = np.mean(p - y)
+        errors = self.predict(x) - y
+        n = x.shape[0]
+        dw = x.T @ errors * (1 / n)
+        db = np.sum(errors) * (1 / n)
         return dw, db
 
 
 class Exercise:
     @staticmethod
     def get_student() -> str:
-        return "Кудрявцев Павел Павлович, ПМ-35"
+        return "Саакян Айк Алексанович, ПМ-34"
 
     @staticmethod
     def get_topic() -> str:
@@ -105,7 +119,7 @@ class Exercise:
         n_iter: int,
         batch_size: int | None = None,
     ) -> None:
-        if batch_size is None:
+        if batch_size is None or batch_size <= 0 or batch_size > x.shape[0]:
             batch_size = x.shape[0]
 
         for _ in range(n_iter):
@@ -118,4 +132,4 @@ class Exercise:
 
     @staticmethod
     def get_iris_hyperparameters() -> dict[str, int | float]:
-        return {"lr": 0.08, "batch_size": 1}
+        return {"lr": 0.01, "batch_size": 8}

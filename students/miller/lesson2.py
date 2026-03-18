@@ -45,9 +45,45 @@ class LogisticRegression:
         pred = self.predict(x)
         return float(np.mean(-y * np.log(pred) - (1 - y) * np.log(1 - pred)))
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
+    def metric(self, x: np.ndarray, y: np.ndarray, mtype: str = "precision") -> float:
         pred = self.predict(x)
-        return np.mean((pred >= 0.5).astype(int) == y)
+
+        pred_bin = (pred >= 0.5).astype(int)
+
+        tp = np.sum((pred_bin == 1) & (y == 1))
+        fp = np.sum((pred_bin == 1) & (y == 0))
+        fn = np.sum((pred_bin == 0) & (y == 1))
+        tn = np.sum((pred_bin == 0) & (y == 0))
+        if mtype == "accuracy":
+            return (tp + tn) / (tp + fp + tn + fn) if (tp + fp + tn + fn) != 0 else 0.0
+        if mtype == "precision":
+            return tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        if mtype == "recall":
+            return tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        if mtype == "F1":
+            return tp / (tp + 0.5 * (fp + fn)) if (tp + 0.5 * (fp + fn)) > 0 else 0.0
+        if mtype == "AUROC":
+            pos_scores = pred[y == 1]
+            neg_scores = pred[y == 0]
+
+            n_pos = len(pos_scores)
+            n_neg = len(neg_scores)
+
+            if n_pos == 0 or n_neg == 0:
+                return 0.5
+
+            n_correct = 0
+            total_pairs = n_pos * n_neg
+
+            for pos_score in pos_scores:
+                for neg_score in neg_scores:
+                    if pos_score > neg_score:
+                        n_correct += 1
+                    elif pos_score == neg_score:
+                        n_correct += 0.5
+
+            return n_correct / total_pairs
+        return 0
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         pred = self.predict(x)
@@ -75,8 +111,30 @@ class Exercise:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_iter: int,
+        batch_size: int | None = None,
+    ) -> None:
         for _iteration in range(n_iter):
-            dw, db = model.grad(x, y)
-            model.weights -= lr * dw
-            model.bias -= lr * db
+            if batch_size is None:
+                dw, db = model.grad(x, y)
+                model.weights -= lr * dw
+                model.bias -= lr * db
+            else:
+                n = x.shape[0]
+                ind = np.random.permutation(n)
+                for i in range(0, x.shape[0], batch_size):
+                    b_ind = ind[i : i + batch_size]
+                    x_batch = x[b_ind]
+                    y_batch = y[b_ind]
+                    dw, db = model.grad(x_batch, y_batch)
+                    model.weights -= lr * dw
+                    model.bias -= lr * db
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        return {"lr": 0.42, "batch_size": 42}

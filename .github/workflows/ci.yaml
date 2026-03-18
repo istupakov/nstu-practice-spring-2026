@@ -44,4 +44,4 @@ jobs:
         continue-on-error: ${{ github.ref == 'refs/heads/main' }}
         run: |
           FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
-          uv run pytest --changed-files=$FILES
+          uv run pytest --changed-files="$FILES"
