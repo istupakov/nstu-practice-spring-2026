@@ -138,8 +138,8 @@ class Exercise:
         else:
             for _ in range(n_iter):
                 for i in range(0, len(x), batch_size):
-                    x_batch = x[i:i + batch_size]
-                    y_batch = y[i:i + batch_size]
+                    x_batch = x[i : i + batch_size]
+                    y_batch = y[i : i + batch_size]
 
                     dw, db = model.grad(x_batch, y_batch)
                     model.weights -= lr * dw
