@@ -45,32 +45,44 @@ class LogisticRegression:
         pred = self.predict(x)
         return float(np.mean(-y * np.log(pred) - (1 - y) * np.log(1 - pred)))
 
-    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "precision") -> float:
+    def metric(self, x: np.ndarray, y: np.ndarray, mtype: str = "precision") -> float:
         pred = self.predict(x)
-        tp = np.sum((pred == 1) & (y == 1))
-        fp = np.sum((pred == 1) & (y == 0))
-        fn = np.sum((pred == 0) & (y == 1))
-        if type == "precision":
-            return tp / (tp + fp)
-        if type == "recall":
-            return tp / (tp + fn)
-        if type == "f1":
-            return tp / (tp + 1 / 2 * (fp + fn))
-        if type == "auroc":
-            ind = np.argsort(pred)[::-1]
-            y_sorted = y[ind]
-            total_tp = np.sum(y == 1)
-            total_tn = np.sum(y == 0)
-            tpr = []
-            fpr = []
-            for i in range(len(pred)):
-                tp_i = np.sum(y_sorted[: i + 1] == 1)
-                fp_i = np.sum(y_sorted[: i + 1] == 0)
 
-                tpr.append(tp_i / total_tp)
-                fpr.append(fp_i / total_tn)
+        pred_bin = (pred >= 0.5).astype(int)
 
-            return np.trapezoid(tpr, fpr)
+        tp = np.sum((pred_bin == 1) & (y == 1))
+        fp = np.sum((pred_bin == 1) & (y == 0))
+        fn = np.sum((pred_bin == 0) & (y == 1))
+        tn = np.sum((pred_bin == 0) & (y == 0))
+        if mtype == "accuracy":
+            return (tp + tn) / (tp + fp + tn + fn) if (tp + fp + tn + fn) != 0 else 0.0
+        if mtype == "precision":
+            return tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        if mtype == "recall":
+            return tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        if mtype == "F1":
+            return tp / (tp + 0.5 * (fp + fn)) if (tp + 0.5 * (fp + fn)) > 0 else 0.0
+        if mtype == "AUROC":
+            pos_scores = pred[y == 1]
+            neg_scores = pred[y == 0]
+
+            n_pos = len(pos_scores)
+            n_neg = len(neg_scores)
+
+            if n_pos == 0 or n_neg == 0:
+                return 0.5
+
+            n_correct = 0
+            total_pairs = n_pos * n_neg
+
+            for pos_score in pos_scores:
+                for neg_score in neg_scores:
+                    if pos_score > neg_score:
+                        n_correct += 1
+                    elif pos_score == neg_score:
+                        n_correct += 0.5
+
+            return n_correct / total_pairs
         return 0
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
@@ -105,7 +117,7 @@ class Exercise:
         y: np.ndarray,
         lr: float,
         n_iter: int,
-        batch_size: int | None,
+        batch_size: int | None = None,
     ) -> None:
         for _iteration in range(n_iter):
             if batch_size is None:
@@ -114,9 +126,15 @@ class Exercise:
                 model.bias -= lr * db
             else:
                 n = x.shape[0]
-                ind = np.random.choice(n, batch_size, replace=False)
-                x_batch = x[ind]
-                y_batch = y[ind]
-                dw, db = model.grad(x_batch, y_batch)
-                model.weights -= lr * dw
-                model.bias -= lr * db
+                ind = np.random.permutation(n)
+                for i in range(0, x.shape[0], batch_size):
+                    b_ind = ind[i : i + batch_size]
+                    x_batch = x[b_ind]
+                    y_batch = y[b_ind]
+                    dw, db = model.grad(x_batch, y_batch)
+                    model.weights -= lr * dw
+                    model.bias -= lr * db
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        return {"lr": 0.42, "batch_size": 42}
