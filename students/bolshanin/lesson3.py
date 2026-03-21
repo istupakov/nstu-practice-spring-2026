@@ -49,6 +49,7 @@ class LinearLayer(Layer):
         assert self._grad_bias is not None
         return [self._grad_weights, self._grad_bias]
 
+
 class ReLULayer(Layer):
     def __init__(self) -> None:
         self._input_cache: np.ndarray | None = None
@@ -77,7 +78,6 @@ class SigmoidLayer(Layer):
     def __init__(self) -> None:
         self._output_cache: np.ndarray | None = None
 
-
     def forward(self, x: np.ndarray) -> np.ndarray:
         output = 1 / (1 + np.exp(-x))
         self._output_cache = output
@@ -101,7 +101,6 @@ class SigmoidLayer(Layer):
 class LogSoftmaxLayer(Layer):
     def __init__(self) -> None:
         self._softmax_cache: np.ndarray | None = None
-
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         x_max = np.max(x, axis=-1, keepdims=True)
