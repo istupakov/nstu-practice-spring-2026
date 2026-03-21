@@ -43,7 +43,9 @@ class LinearLayer(Layer):
 
     @property
     def grad(self) -> Sequence[np.ndarray]:
-        assert self.grad_weights is not None and self.grad_bias is not None, "LinearLaye: backward must be called before accessing grad"
+        assert self.grad_weights is not None and self.grad_bias is not None, (
+            "LinearLaye: backward must be called before accessing grad"
+        )
         return self.grad_weights, self.grad_bias
 
 
