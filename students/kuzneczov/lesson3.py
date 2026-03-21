@@ -61,12 +61,11 @@ class ReLULayer(Layer):
 
 class SigmoidLayer(Layer):
     def forward(self, x: np.ndarray) -> np.ndarray:
-        self.x_input = x
-        return 1 / (1 + np.exp(-x))
+        self.x_out = 1 / (1 + np.exp(-x))
+        return self.x_out
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        sigm = self.forward(self.x_input)
-        return dy * sigm * (1 - sigm)
+        return dy * self.x_out * (1 - self.x_out)
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
@@ -79,12 +78,12 @@ class SigmoidLayer(Layer):
 
 class LogSoftmaxLayer(Layer):
     def forward(self, x: np.ndarray) -> np.ndarray:
-        self.x_input = x
         c = np.max(x, axis=-1, keepdims=True)
-        return x - c - np.log(np.sum(np.exp(x - c), axis=-1, keepdims=True))
+        self.x_out = x - c - np.log(np.sum(np.exp(x - c), axis=-1, keepdims=True))
+        return self.x_out
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        return dy - np.exp(self.forward(self.x_input)) * np.sum(dy, axis=-1, keepdims=True)
+        return dy - np.exp(self.forward(self.x_out)) * np.sum(dy, axis=-1, keepdims=True)
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
