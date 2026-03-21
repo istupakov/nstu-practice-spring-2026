@@ -44,11 +44,11 @@ class LinearLayer(Layer):
 
 class ReLULayer(Layer):
     def forward(self, x: np.ndarray) -> np.ndarray:
-        self.x_input = x
-        return np.maximum(x, 0)
+        self.x_out = np.maximum(x, 0)
+        return self.x_out
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        return dy * np.sign(self.forward(self.x_input))
+        return dy * np.sign(self.x_out)
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
@@ -83,7 +83,7 @@ class LogSoftmaxLayer(Layer):
         return self.x_out
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        return dy - np.exp(self.forward(self.x_out)) * np.sum(dy, axis=-1, keepdims=True)
+        return dy - np.exp(self.x_out) * np.sum(dy, axis=-1, keepdims=True)
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
