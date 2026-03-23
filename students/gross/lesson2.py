@@ -48,9 +48,20 @@ class LogisticRegression:
         y_pred = np.clip(y_pred, eps, 1 - eps)
         return float(-np.mean(y * np.log(y_pred) + (1 - y) * np.log(1 - y_pred)))
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        y_pred = self.predict(x) >= 0.5
-        return np.mean(y_pred == y)
+    def metric(self, x: np.ndarray, y: np.ndarray, type: str | None = None) -> float:
+        if type is None or type == "accuracy":
+            y_pred = self.predict(x) >= 0.5
+            return np.mean(y_pred == y)
+        elif type == "precision":
+            return self.precision(x, y)
+        elif type == "recall":
+            return self.recall(x, y)
+        elif type == "F1":
+            return self.f1(x, y)
+        elif type == "AUROC":
+            return self.auroc(x, y)
+        else:
+            raise ValueError(f"Unknown metric type: {type}")
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         y_pred = self.predict(x)

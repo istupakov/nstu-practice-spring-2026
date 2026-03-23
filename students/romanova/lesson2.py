@@ -42,11 +42,76 @@ class LogisticRegression:
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
         predictions = self.predict(x)
-        return -np.mean(y * np.log(predictions + 1e-10) + (1 - y) * np.log(1 - predictions + 1e-10))
+        return float(-np.mean(y * np.log(predictions + 1e-10) + (1 - y) * np.log(1 - predictions + 1e-10)))
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        predictions = self.predict(x) >= 0.5
-        return np.mean(predictions == y)
+    def metric(self, x: np.ndarray, y: np.ndarray, metric: str = "accuracy") -> float:
+        probabilities = self.predict(x)
+
+        if len(y) == 0:
+            return 0.0
+
+        predictions = (probabilities >= 0.5).astype(int)
+
+        tp = np.sum((predictions == 1) & (y == 1))
+        fp = np.sum((predictions == 1) & (y == 0))
+        tn = np.sum((predictions == 0) & (y == 0))
+        fn = np.sum((predictions == 0) & (y == 1))
+
+        total = tp + fp + tn + fn
+
+        if metric == "accuracy":
+            return float((tp + tn) / total) if total > 0 else 0.0
+        elif metric == "precision":
+            return float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0
+        elif metric == "recall":
+            return float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
+        elif metric == "F1":
+            if (tp + fp) > 0 and (tp + fn) > 0:
+                precision = tp / (tp + fp)
+                recall = tp / (tp + fn)
+                if precision + recall > 0:
+                    return float(2 * precision * recall / (precision + recall))
+            return 0.0
+        elif metric == "AUROC":
+            return float(self._roc_auc_score(y, probabilities))
+        else:
+            raise ValueError(f"Unsupported metric: {metric}")
+
+    def _roc_auc_score(self, y_true: np.ndarray, y_scores: np.ndarray) -> float:
+        n = len(y_true)
+        if n == 0:
+            return 0.5
+
+        n_pos = np.sum(y_true == 1)
+        n_neg = np.sum(y_true == 0)
+
+        if n_pos == 0 or n_neg == 0:
+            return 0.5
+
+        sorted_indices = np.argsort(-y_scores)
+        y_sorted = y_true[sorted_indices]
+
+        auc = 0.0
+        tp = 0
+        fp = 0
+        prev_tpr = 0.0
+        prev_fpr = 0.0
+
+        for i in range(n):
+            if y_sorted[i] == 1:
+                tp += 1
+            else:
+                fp += 1
+
+            tpr = tp / n_pos
+            fpr = fp / n_neg
+
+            auc += (fpr - prev_fpr) * (tpr + prev_tpr) / 2
+
+            prev_tpr = tpr
+            prev_fpr = fpr
+
+        return auc
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         predictions = self.predict(x)
@@ -78,9 +143,30 @@ class Exercise:
         return LogisticRegression(num_features, rng)
 
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _ in range(n_iter):
-            gradient_w, gradient_b = model.grad(x, y)
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_iter: int,
+        batch_size: int | None = None,
+    ) -> None:
+        n = x.shape[0]
 
-            model.weights -= lr * gradient_w
-            model.bias -= lr * gradient_b
+        for _ in range(n_iter):
+            if batch_size is None:
+                gradient_w, gradient_b = model.grad(x, y)
+                model.weights -= lr * gradient_w
+                model.bias -= lr * gradient_b
+            else:
+                for i in range(0, n, batch_size):
+                    x_sh = x[i : min(i + batch_size, n)]
+                    y_sh = y[i : min(i + batch_size, n)]
+
+                    gradient_w, gradient_b = model.grad(x_sh, y_sh)
+                    model.weights -= lr * gradient_w
+                    model.bias -= lr * gradient_b
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, float | int]:
+        return {"lr": 0.005, "batch_size": 2}
