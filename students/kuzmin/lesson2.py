@@ -113,7 +113,8 @@ class Exercise:
         n_epoch: int,
         batch_size: int | None = None,
     ) -> None:
-        if batch_size is None: batch_size= len(x)
+        if batch_size is None:
+            batch_size = len(x)
         for _ in range(n_epoch):
             for i in range(0, len(x), batch_size):
                 dw, db = model.grad(x[i : i + batch_size], y[i : i + batch_size])
