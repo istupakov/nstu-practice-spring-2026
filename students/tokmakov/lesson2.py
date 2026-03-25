@@ -13,20 +13,17 @@ class LinearRegression:
         return x @ self.weights + self.bias
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        n = len(x)
-        return (np.sum(np.square(y - self.predict(x)))) / n
+        y_pred = self.predict(x)
+        return float(np.mean((y - y_pred) ** 2))
 
     def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        return 1 - np.sum(np.square(y - self.predict(x))) / np.sum(np.square(y - np.mean(y)))
+        return float(1 - self.loss(x, y) / np.var(y))
 
-    def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        n = len(x)
-        predictions = self.predict(x)
-        errors = y - predictions
-        grad_w = (-2 / n) * x.T @ errors
-        grad_b = (-2 / n) * np.sum(errors)
-        grad_b = np.array(grad_b)
-
+    def grad(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, float]:
+        y_pred = self.predict(x)
+        errors = y - y_pred
+        grad_w = -2 * x.T @ errors / x.shape[0]
+        grad_b = float(-2 * np.mean(errors))
         return grad_w, grad_b
 
 
@@ -43,22 +40,47 @@ class LogisticRegression:
         return 1 / (1 + np.exp(-z))
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
-        eps = 1e-15
-        p = np.clip(self.predict(x), eps, 1 - eps)
-        losses = -(y * np.log(p) + (1 - y) * np.log(1 - p))
-        return float(np.mean(losses))
+        p = np.clip(self.predict(x), 1e-15, 1 - 1e-15)
+        return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
+    def metric(self, x: np.ndarray, y: np.ndarray, type: str | None = None) -> float:
         p = self.predict(x)
-        predictions = p >= 0.5
-        return float(np.mean(predictions == y))
+        y_pred = (p >= 0.5).astype(int)
 
-    def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        n = x.shape[0]
+        if type is None or type == "accuracy":
+            return float(np.mean(y_pred == y))
+
+        tp = float(np.sum((y_pred == 1) & (y == 1)))
+        fp = float(np.sum((y_pred == 1) & (y == 0)))
+        fn = float(np.sum((y_pred == 0) & (y == 1)))
+
+        if type == "precision":
+            return tp / (tp + fp) if tp + fp > 0 else 0.0
+        elif type == "recall":
+            return tp / (tp + fn) if tp + fn > 0 else 0.0
+        elif type == "F1":
+            precision = tp / (tp + fp) if tp + fp > 0 else 0.0
+            recall = tp / (tp + fn) if tp + fn > 0 else 0.0
+            return 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+        elif type == "AUROC":
+            pos_scores = p[y == 1]
+            neg_scores = p[y == 0]
+
+            if len(pos_scores) == 0 or len(neg_scores) == 0:
+                return 0.5
+
+            correct_pairs = np.sum(pos_scores[:, None] > neg_scores[None, :])
+            tie_pairs = np.sum(pos_scores[:, None] == neg_scores[None, :])
+
+            return float((correct_pairs + 0.5 * tie_pairs) / (len(pos_scores) * len(neg_scores)))
+
+        return 0.0
+
+    def grad(self, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, float]:
         p = self.predict(x)
-        grad_w = (1 / n) * x.T @ (p - y)
-        grad_b = (1 / n) * np.sum(p - y)
-        return grad_w, np.array(grad_b)
+        grad_w = x.T @ (p - y) / x.shape[0]
+        grad_b = float(np.mean(p - y))
+        return grad_w, grad_b
 
 
 class Exercise:
@@ -87,19 +109,17 @@ class Exercise:
         n_iter: int,
         batch_size: int | None = None,
     ) -> None:
-        n = x.shape[0]
         if batch_size is None:
-            batch_size = n
+            batch_size = int(x.shape[0])
 
         for _ in range(n_iter):
-            for i in range(0, n, batch_size):
-                x_batch = x[i : i + batch_size]
-                y_batch = y[i : i + batch_size]
-
-                grad_w, grad_b = model.grad(x_batch, y_batch)
-                model.weights -= lr * grad_w
-                model.bias -= lr * grad_b
+            for i in range(x.shape[0] // batch_size):
+                x_batch = x[i * batch_size : (i + 1) * batch_size]
+                y_batch = y[i * batch_size : (i + 1) * batch_size]
+                dw, db = model.grad(x_batch, y_batch)
+                model.weights -= lr * dw
+                model.bias -= lr * db
 
     @staticmethod
     def get_iris_hyperparameters() -> dict[str, int | float]:
-        return {"lr": 0.1, "batch_size": 32}
+        return {"lr": 0.08, "batch_size": 32}
