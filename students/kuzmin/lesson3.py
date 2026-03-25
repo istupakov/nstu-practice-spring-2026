@@ -61,11 +61,11 @@ class ReLULayer(Layer):
 
 class SigmoidLayer(Layer):
     def forward(self, x: np.ndarray) -> np.ndarray:
-        self.input = x
-        return 1 / (1 + np.exp(-x))
+        self.sig = 1 / (1 + np.exp(-x))
+        return self.sig
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        return dy * self.forward(self.input) * (1 - self.forward(self.input))
+        return dy * self.sig * (1 - self.sig)
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
