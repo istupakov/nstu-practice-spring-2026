@@ -9,5 +9,6 @@
         ".pytest_cache": true,
         ".ruff_cache": true,
         "**/__pycache__": true
-    }
+    },
+    "jupyter.notebookFileRoot": "${workspaceFolder}"
 }
