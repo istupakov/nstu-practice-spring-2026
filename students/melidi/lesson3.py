@@ -122,7 +122,7 @@ class Model:
     def backward(self, dy: np.ndarray) -> np.ndarray:
         grad = dy
         for layer in self.layers[::-1]:
-            grad = layer.backward(grad)  # type: ignore[attr-defined]
+            grad = layer.backward(grad)
         return grad
 
     @property

@@ -35,10 +35,10 @@ class LinearLayer(Layer):
     def backward(self, dy: np.ndarray) -> np.ndarray:
         if self._input_cache is None:
             raise RuntimeError("LinearLayer: forward() must be called before backward()")
-        
+
         self._grad_weights = dy.T @ self._input_cache
         self._grad_bias = np.sum(dy, axis=0)
-        
+
         return dy @ self.weights
 
     @property
@@ -86,7 +86,7 @@ class SigmoidLayer(Layer):
     def backward(self, dy: np.ndarray) -> np.ndarray:
         if self._output_cache is None:
             raise RuntimeError("SigmoidLayer: forward() must be called before backward()")
-        
+
         sigmoid_x = self._output_cache
         return dy * sigmoid_x * (1 - sigmoid_x)
 
@@ -108,14 +108,14 @@ class LogSoftmaxLayer(Layer):
         x_max = np.max(x, axis=self._axis, keepdims=True)
         exp_shifted = np.exp(x - x_max)
         sum_exp = np.sum(exp_shifted, axis=self._axis, keepdims=True)
-        
+
         self._softmax_cache = exp_shifted / sum_exp
         return (x - x_max) - np.log(sum_exp)
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
         if self._softmax_cache is None:
             raise RuntimeError("LogSoftmaxLayer: forward() must be called before backward()")
-        
+
         sum_dy = np.sum(dy, axis=self._axis, keepdims=True)
         return dy - self._softmax_cache * sum_dy
 
