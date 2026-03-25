@@ -88,8 +88,6 @@ class LogisticRegression:
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         pred = self.predict(x)
         n = np.float64(len(x))
-        # Fix: The gradient for logistic regression is (1/n) * x.T @ (pred - y)
-        # But we need to ensure the sign is correct for gradient descent
         dw = (1.0 / n) * (x.T @ (pred - y))
         db = (1.0 / n) * np.sum(pred - y)
         return dw, db
