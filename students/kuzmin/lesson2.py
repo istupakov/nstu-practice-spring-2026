@@ -47,7 +47,7 @@ class LogisticRegression:
 
         TP = (p[y == 1] >= threshold).sum()
         FP = (p[y == 0] >= threshold).sum()
-        # TN = (p[y == 0] < threshold).sum()
+        TN = (p[y == 0] < threshold).sum()
         FN = (p[y == 1] < threshold).sum()
 
         if type == "accuracy":
@@ -69,8 +69,8 @@ class LogisticRegression:
         else:  # type == Auroc
             x_arr = []
             y_arr = []
-            P = (y == 1).sum()
-            N = (y == 0).sum()
+            P = TP + FN
+            N = FP + TN
             for threshold in np.linspace(1.0, 0.0, 1000):
                 TP = (p[y == 1] >= threshold).sum()
                 FP = (p[y == 0] >= threshold).sum()
@@ -114,16 +114,12 @@ class Exercise:
         batch_size: int | None = None,
     ) -> None:
         if batch_size is None:
-            for _ in range(n_epoch):
-                dw, db = model.grad(x, y)
+            batch_size = len(x)
+        for _ in range(n_epoch):
+            for i in range(0, len(x), batch_size):
+                dw, db = model.grad(x[i : i + batch_size], y[i : i + batch_size])
                 model.weights -= lr * dw
                 model.bias -= lr * db
-        else:
-            for _ in range(n_epoch):
-                for i in range(0, len(x), batch_size):
-                    dw, db = model.grad(x[i : i + batch_size], y[i : i + batch_size])
-                    model.weights -= lr * dw
-                    model.bias -= lr * db
 
     @staticmethod
     def get_iris_hyperparameters() -> dict[str, int | float]:
