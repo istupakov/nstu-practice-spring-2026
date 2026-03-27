@@ -227,4 +227,12 @@ class Exercise:
     @staticmethod
     def train_model(
         model: Layer, loss: Loss, x: np.ndarray, y: np.ndarray, lr: float, n_epoch: int, batch_size: int
-    ) -> None: ...
+    ) -> None:
+        for _ in range(n_epoch):
+            for i in range(0, x.shape[0], batch_size):
+                x_batch = x[i : i + batch_size]
+                y_batch = y[i : i + batch_size]
+                loss.forward(model.forward(x_batch), y_batch)
+                model.backward(loss.backward())
+                for p, g in zip(model.parameters, model.grad, strict=True):
+                    p += -lr * g
