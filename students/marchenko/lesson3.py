@@ -16,6 +16,12 @@ class Layer(Protocol):
     def grad(self) -> Sequence[np.ndarray]: ...
 
 
+class Loss(Protocol):
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray: ...
+
+    def backward(self) -> np.ndarray: ...
+
+
 class LinearLayer(Layer):
     def __init__(self, in_features: int, out_features: int, rng: np.random.Generator | None = None) -> None:
         if rng is None:
@@ -159,6 +165,131 @@ class Model(Layer):
         return grads
 
 
+class MSELoss(Loss):
+    def __init__(self) -> None:
+        self._x: np.ndarray | None = None
+        self._y: np.ndarray | None = None
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        # сохраняем для backward
+        self._x = x
+        self._y = y
+
+        loss = np.mean((x - y) ** 2)
+
+        return loss
+
+    def backward(self) -> np.ndarray:
+        assert self._x is not None and self._y is not None
+
+        n = self._x.size
+
+        dx = 2 * (self._x - self._y) / n
+
+        return dx
+
+
+class BCELoss(Loss):
+    def __init__(self) -> None:
+        self._x: np.ndarray | None = None
+        self._y: np.ndarray | None = None
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        # Сохраняем для backward
+        self._x = x
+        self._y = y
+        eps = 1e-15  # для защиты от log(0)
+        prediction = np.clip(x, eps, 1 - eps)
+
+        loss = -(y * np.log(prediction) + (1 - y) * np.log(1 - prediction))
+        return np.mean(loss)
+
+    def backward(self) -> np.ndarray:
+        assert self._x is not None and self._y is not None
+
+        n = self._x.shape[0]
+        # Защита от деления на 0
+        eps = 1e-15
+        delitel = self._x * (1 - self._x) + eps
+
+        dx = (self._x - self._y) / (n * delitel)
+
+        return dx
+
+
+class NLLLoss(Loss):
+    def __init__(self) -> None:
+        self._x: np.ndarray | None = None
+        self._y: np.ndarray | None = None
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self._x = x
+        self._y = y
+        n = x.shape[0]
+        if y.ndim == 1:  # индексы классов
+            correct_log_probs = x[np.arange(n), y.astype(int)]
+            loss = -np.mean(correct_log_probs)
+        else:  # one-hot
+            loss = -np.mean(np.sum(y * x, axis=-1))
+        return loss
+
+    def backward(self) -> np.ndarray:
+        assert self._x is not None and self._y is not None
+        n = self._x.shape[0]
+        dx = np.zeros_like(self._x)
+        if self._y.ndim == 1:  # индексы классов
+            dx[np.arange(n), self._y.astype(int)] = -1 / n
+        else:  # one-hot
+            dx = -self._y / n
+        return dx
+
+
+class CrossEntropyLoss(Loss):
+    def __init__(self) -> None:
+        self._x: np.ndarray | None = None
+        self._y: np.ndarray | None = None
+        self._softmax: np.ndarray | None = None
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self._x = x
+        self._y = y
+        n = x.shape[0]  # размер батча
+
+        x_max = np.max(x, axis=-1, keepdims=True)  # максимум по классам
+        exp_x = np.exp(x - x_max)
+        sum_exp = np.sum(exp_x, axis=-1, keepdims=True)
+
+        log_softmax = (x - x_max) - np.log(sum_exp)
+
+        self._softmax = np.exp(log_softmax)
+
+        if y.ndim == 1:
+            # Индексы
+            correct_log_probs = log_softmax[np.arange(n), y.astype(int)]
+        else:
+            # One-hot
+            correct_log_probs = np.sum(y * log_softmax, axis=-1)
+
+        loss = -np.mean(correct_log_probs)
+        return loss
+
+    def backward(self) -> np.ndarray:
+        assert self._softmax is not None and self._y is not None and self._x is not None
+
+        n = self._x.shape[0]
+        dx = self._softmax.copy()
+
+        if self._y.ndim == 1:
+            # Индексы
+            dx[np.arange(n), self._y.astype(int)] -= 1
+        else:
+            # One-hot
+            dx -= self._y
+
+        dx = dx / n
+        return dx
+
+
 class Exercise:
     @staticmethod
     def get_student() -> str:
@@ -187,3 +318,61 @@ class Exercise:
     @staticmethod
     def create_model(*layers: Layer) -> Layer:
         return Model(*layers)
+
+    @staticmethod
+    def create_mse_loss() -> Loss:
+        return MSELoss()
+
+    @staticmethod
+    def create_bce_loss() -> Loss:
+        return BCELoss()
+
+    @staticmethod
+    def create_nll_loss() -> Loss:
+        return NLLLoss()
+
+    @staticmethod
+    def create_cross_entropy_loss() -> Loss:
+        return CrossEntropyLoss()
+
+    @staticmethod
+    def train_model(
+        model: Layer,
+        loss: Loss,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int,
+        shuffle: bool = False,
+    ) -> None:
+        n_samples = x.shape[0]
+        for _ in range(n_epoch):
+            if shuffle:
+                indices = np.random.permutation(n_samples)
+                x_shuffled = x[indices]
+                y_shuffled = y[indices]
+            else:
+                x_shuffled = x
+                y_shuffled = y
+
+            for start_idx in range(0, n_samples, batch_size):
+                # Вычисляем конец батча
+                end_idx = min(start_idx + batch_size, n_samples)
+
+                # Вырезаем текущий батч
+                x_batch = x_shuffled[start_idx:end_idx]
+                y_batch = y_shuffled[start_idx:end_idx]
+
+                # Данные проходят через все слои модели
+                predictions = model.forward(x_batch)
+
+                loss.forward(predictions, y_batch)
+
+                # Градиент от Loss
+                dloss = loss.backward()
+
+                model.backward(dloss)
+
+                for param, grad in zip(model.parameters, model.grad, strict=True):
+                    param -= lr * grad

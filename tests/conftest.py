@@ -60,7 +60,9 @@ def find_all_assignments() -> Iterator[type[Assignment]]:
 
 
 def get_students() -> Iterable[str]:
-    return set(students + [obj.get_student() for obj in find_all_assignments()])
+    res = set(students + [obj.get_student() for obj in find_all_assignments()])
+    res.remove("Фамилия Имя Отчество, ПМ-XX")
+    return res
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
