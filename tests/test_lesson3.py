@@ -20,6 +20,14 @@ class Layer(Protocol):
     def grad(self) -> Sequence[np.ndarray]: ...
 
 
+@runtime_checkable
+class Loss(Protocol):
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray: ...
+
+    def backward(self) -> np.ndarray: ...
+
+
+@runtime_checkable
 class Lesson3Assignment(Protocol):
     @staticmethod
     def create_linear_layer(in_features: int, out_features: int, rng: np.random.Generator | None = None) -> Layer: ...
@@ -35,6 +43,23 @@ class Lesson3Assignment(Protocol):
 
     @staticmethod
     def create_model(*layers: Layer) -> Layer: ...
+
+    @staticmethod
+    def create_mse_loss() -> Loss: ...
+
+    @staticmethod
+    def create_bce_loss() -> Loss: ...
+
+    @staticmethod
+    def create_nll_loss() -> Loss: ...
+
+    @staticmethod
+    def create_cross_entropy_loss() -> Loss: ...
+
+    @staticmethod
+    def train_model(
+        model: Layer, loss: Loss, x: np.ndarray, y: np.ndarray, lr: float, n_epoch: int, batch_size: int
+    ) -> None: ...
 
 
 def sigmoid(x: np.ndarray) -> np.ndarray:
@@ -285,4 +310,135 @@ class TestModel:
 
         model_grad = model.grad
         for actual, expected in zip(model_grad, grad, strict=True):
+            np.testing.assert_allclose(actual, expected, strict=True)
+
+
+@pytest.mark.parametrize("shape", [(1, 5), (5, 3)])
+class TestLosses:
+    def test_mse_loss(self, assignment_finder: AssignmentFinder, shape: tuple[int]):
+        assignment = assignment_finder()
+        if not isinstance(assignment, Lesson3Assignment):
+            pytest.skip()
+        fn = assignment.create_mse_loss()
+        assert isinstance(fn, Loss)
+
+        rng = np.random.default_rng(42)
+        x = rng.random(shape, dtype=np.float32)
+        y = rng.random(shape, dtype=np.float32)
+        loss = np.mean((x - y) ** 2)
+        dy = 2 * (x - y) / x.size
+
+        fn_loss = fn.forward(x, y)
+        np.testing.assert_allclose(fn_loss, loss, strict=True)
+
+        fn_dy = fn.backward()
+        np.testing.assert_allclose(fn_dy, dy, strict=True)
+
+    def test_bce_loss(self, assignment_finder: AssignmentFinder, shape: tuple[int]):
+        assignment = assignment_finder()
+        if not isinstance(assignment, Lesson3Assignment):
+            pytest.skip()
+        fn = assignment.create_bce_loss()
+        assert isinstance(fn, Loss)
+
+        rng = np.random.default_rng(42)
+        batch_size = shape[0]
+        x = sigmoid(rng.random(shape, dtype=np.float32))
+        y = rng.integers(2, size=shape)
+        loss = -np.mean(y * np.log(x) + (1 - y) * np.log(1 - x))
+        dy = (x - y) / (x * (1 - x)) / batch_size
+
+        fn_loss = fn.forward(x, y)
+        np.testing.assert_allclose(fn_loss, loss, strict=True)
+
+        fn_dy = fn.backward()
+        np.testing.assert_allclose(fn_dy, dy, strict=True)
+
+    def test_nll_loss(self, assignment_finder: AssignmentFinder, shape: tuple[int]):
+        assignment = assignment_finder()
+        if not isinstance(assignment, Lesson3Assignment):
+            pytest.skip()
+        fn = assignment.create_nll_loss()
+        assert isinstance(fn, Loss)
+
+        rng = np.random.default_rng(42)
+        batch_size = shape[0]
+        x = log_softmax(500 - 1000 * rng.random(shape, dtype=np.float32))
+        y = rng.integers(shape[-1], size=batch_size)
+        hot_y = np.zeros_like(x)
+        hot_y[np.arange(batch_size), y] = 1
+
+        loss = -np.sum(x * hot_y) / batch_size
+        dy = -hot_y / batch_size
+
+        fn_loss = fn.forward(x, y)
+        np.testing.assert_allclose(fn_loss, loss, strict=True)
+
+        fn_dy = fn.backward()
+        np.testing.assert_allclose(fn_dy, dy, strict=True)
+
+    def test_cross_entropy_loss(self, assignment_finder: AssignmentFinder, shape: tuple[int]):
+        assignment = assignment_finder()
+        if not isinstance(assignment, Lesson3Assignment):
+            pytest.skip()
+        fn = assignment.create_cross_entropy_loss()
+        assert isinstance(fn, Loss)
+
+        rng = np.random.default_rng(42)
+        batch_size = shape[0]
+        x = 500 - 1000 * rng.random(shape, dtype=np.float32)
+        y = rng.integers(shape[-1], size=batch_size)
+        hot_y = np.zeros_like(x)
+        hot_y[np.arange(batch_size), y] = 1
+
+        logprobs = log_softmax(x)
+        loss = -np.sum(logprobs * hot_y) / batch_size
+        dy = (np.exp(logprobs) - hot_y) / batch_size
+
+        fn_loss = fn.forward(x, y)
+        np.testing.assert_allclose(fn_loss, loss, strict=True)
+
+        fn_dy = fn.backward()
+        np.testing.assert_allclose(fn_dy, dy, strict=True)
+
+
+@pytest.mark.parametrize(("lr", "n_epoch", "batch_size"), [(1e-3, 1, 3), (1e-2, 1, 1), (1e-3, 2, 3)])
+class TestTraining:
+    def create_model(self, assignment: Lesson3Assignment) -> Layer:
+        sizes = [3, 5, 4]
+        rng = np.random.default_rng(42)
+        return assignment.create_model(
+            assignment.create_linear_layer(sizes[0], sizes[1], rng),
+            assignment.create_relu_layer(),
+            assignment.create_linear_layer(sizes[1], sizes[2], rng),
+        )
+
+    def train_model(
+        self, model: Layer, loss: Loss, x: np.ndarray, y: np.ndarray, lr: float, n_epoch: int, batch_size: int
+    ) -> None:
+        idx = np.arange(batch_size, x.shape[0], batch_size)
+        for _ in range(n_epoch):
+            for x_batch, y_batch in zip(np.split(x, idx, axis=0), np.split(y, idx, axis=0), strict=True):
+                loss.forward(model.forward(x_batch), y_batch)
+                model.backward(loss.backward())
+
+                for p, g in zip(model.parameters, model.grad, strict=True):
+                    p += -lr * g
+
+    def test_train_mse(self, assignment_finder: AssignmentFinder, lr: float, n_epoch: int, batch_size: int):
+        assignment = assignment_finder()
+        if not isinstance(assignment, Lesson3Assignment):
+            pytest.skip()
+        fn = assignment.create_mse_loss()
+        model1 = self.create_model(assignment)
+        model2 = self.create_model(assignment)
+
+        rng = np.random.default_rng(42)
+        x = rng.random((10, 3), dtype=np.float32)
+        y = rng.random((10, 4), dtype=np.float32)
+
+        self.train_model(model1, fn, x, y, lr, n_epoch, batch_size)
+        assignment.train_model(model2, fn, x, y, lr, n_epoch, batch_size)
+
+        for actual, expected in zip(model2.parameters, model1.parameters, strict=True):
             np.testing.assert_allclose(actual, expected, strict=True)

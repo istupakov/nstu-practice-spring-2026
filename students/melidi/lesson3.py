@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
@@ -110,33 +111,33 @@ class LogSoftmaxLayer:
 
 
 class Model:
-    def __init__(self, layers: tuple[object, ...]) -> None:
+    def __init__(self, layers: tuple[Any, ...]) -> None:
         self.layers = layers
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         out = x
         for layer in self.layers:
-            out = layer.forward(out)  # type: ignore[attr-defined]
+            out = layer.forward(out)
         return out
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
         grad = dy
         for layer in self.layers[::-1]:
-            grad = layer.backward(grad)  # type: ignore[attr-defined]
+            grad = layer.backward(grad)
         return grad
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
         params: list[np.ndarray] = []
         for layer in self.layers:
-            params.extend(list(layer.parameters))  # type: ignore[attr-defined]
+            params.extend(list(layer.parameters))
         return tuple(params)
 
     @property
     def grad(self) -> Sequence[np.ndarray]:
         grads: list[np.ndarray] = []
         for layer in self.layers:
-            grads.extend(list(layer.grad))  # type: ignore[attr-defined]
+            grads.extend(list(layer.grad))
         return tuple(grads)
 
 
