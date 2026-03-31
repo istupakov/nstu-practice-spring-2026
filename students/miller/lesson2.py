@@ -34,12 +34,12 @@ class LogisticRegression:
     bias: np.ndarray
 
     def __init__(self, num_features: int, rng: np.random.Generator) -> None:
-        self.weights = rng.random(num_features)
-        self.bias = np.array(0.0)
+        self.weights = rng.random(num_features).astype(np.float64)
+        self.bias = np.array(0.0, dtype=np.float64)
 
     def predict(self, x: np.ndarray) -> np.ndarray:
         z = x @ self.weights + self.bias
-        return 1 / (1 + np.exp(-z))
+        return np.where(z >= 0, 1 / (1 + np.exp(-z)), np.exp(z) / (1 + np.exp(z)))
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
         pred = self.predict(x)
@@ -87,9 +87,9 @@ class LogisticRegression:
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         pred = self.predict(x)
-        n = len(x)
-        dw = (1 / n) * (x.T @ (pred - y))
-        db = (1 / n) * np.sum(pred - y)
+        n = np.float64(len(x))
+        dw = (1.0 / n) * (x.T @ (pred - y))
+        db = (1.0 / n) * np.sum(pred - y)
         return dw, db
 
 
@@ -119,18 +119,17 @@ class Exercise:
         n_iter: int,
         batch_size: int | None = None,
     ) -> None:
-        for _iteration in range(n_iter):
-            if batch_size is None:
+        if batch_size is None:
+            for _ in range(n_iter):
                 dw, db = model.grad(x, y)
                 model.weights -= lr * dw
                 model.bias -= lr * db
-            else:
-                n = x.shape[0]
-                ind = np.random.permutation(n)
-                for i in range(0, x.shape[0], batch_size):
-                    b_ind = ind[i : i + batch_size]
-                    x_batch = x[b_ind]
-                    y_batch = y[b_ind]
+        else:
+            for _ in range(n_iter):
+                for i in range(0, len(x), batch_size):
+                    x_batch = x[i : i + batch_size]
+                    y_batch = y[i : i + batch_size]
+
                     dw, db = model.grad(x_batch, y_batch)
                     model.weights -= lr * dw
                     model.bias -= lr * db
