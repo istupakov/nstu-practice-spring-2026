@@ -210,10 +210,7 @@ class NLLLoss(Loss):
         self._x = x
         self._y = y
         n = x.shape[0]
-        if y.ndim == 1:
-            loss = -np.mean(x[np.arange(n), y.astype(int)])
-        else:
-            loss = -np.mean(np.sum(y * x, axis=-1))
+        loss = -np.mean(x[np.arange(n), y.astype(int)]) if y.ndim == 1 else -np.mean(np.sum(y * x, axis=-1))
         return loss
 
     def backward(self) -> np.ndarray:
@@ -245,10 +242,11 @@ class CrossEntropyLoss(Loss):
         log_softmax = (x - x_max) - np.log(sum_exp)
         self._softmax = np.exp(log_softmax)
 
-        if y.ndim == 1:
-            loss = -np.mean(log_softmax[np.arange(n), y.astype(int)])
-        else:
-            loss = -np.mean(np.sum(y * log_softmax, axis=-1))
+        loss = (
+            -np.mean(log_softmax[np.arange(n), y.astype(int)])
+            if y.ndim == 1
+            else -np.mean(np.sum(y * log_softmax, axis=-1))
+        )
         return loss
 
     def backward(self) -> np.ndarray:
@@ -290,7 +288,7 @@ class Exercise:
         return LogSoftmaxLayer()
 
     @staticmethod
-    def create_model(*layers: Layer) -> Layer:
+    def create_model(*layers: Layer) -> Model:
         return Model(*layers)
 
     @staticmethod
