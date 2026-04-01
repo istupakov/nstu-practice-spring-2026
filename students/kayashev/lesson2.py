@@ -35,18 +35,50 @@ class LogisticRegression:
 
     def loss(self, x: np.ndarray, y: np.ndarray) -> float:
         predict = self.predict(x)
-        return -np.sum(y * np.log(predict) + (-y + 1) * np.log(-predict + 1))
+        return -np.sum(y * np.log(predict) + (-y + 1) * np.log(-predict + 1)) / y.size
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        alpha = 0.5
+    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
+        def round(x, alpha):
+            return 1 if (x >= alpha) else 0
+
+        vround = np.vectorize(round)
         predict = self.predict(x)
-        predictgrtthan = predict > alpha
-        ygrtthan = y > alpha
-        return np.sum(np.logical_not(np.logical_xor(predictgrtthan, ygrtthan).astype(int))) / y.size
+        roundedpredict = vround(predict, 0.5)
+        roundedy = vround(y, 0.5)
+        tp = np.sum(np.logical_and(roundedpredict, roundedy).astype(int))
+        tn = np.sum(np.logical_and(np.logical_not(roundedpredict), np.logical_not(roundedy)).astype(int))
+        fp = np.sum(np.logical_and(roundedpredict, np.logical_not(roundedy)).astype(int))
+        fn = y.size - tp - tn - fp
+        if type == "accuracy":
+            metric = (tp + tn) / y.size
+        if type == "precision":
+            metric = tp / (tp + fp) if tp + fp != 0 else 0
+        if type == "recall":
+            metric = tp / (tp + fn) if tp + fn != 0 else 0
+        if type == "F1":
+            precision = tp / (tp + fp) if tp + fp != 0 else 0
+            recall = tp / (tp + fn) if tp + fn != 0 else 0
+            metric = 2 * precision * recall / (precision + recall) if precision + recall != 0 else 0
+        if type == "AUROC":
+            xarr = []
+            yarr = []
+            for alpha in np.linspace(1.0, 0.0, 1000):
+                roundedpredict = vround(predict, alpha)
+                roundedy = vround(y, alpha)
+                tp = np.sum(np.logical_and(roundedpredict, roundedy).astype(int))
+                tn = np.sum(np.logical_and(np.logical_not(roundedpredict), np.logical_not(roundedy)).astype(int))
+                fp = np.sum(np.logical_and(roundedpredict, np.logical_not(roundedy)).astype(int))
+                fn = y.size - tp - tn - fp
+                tpr = tp / (tp + fn) if tp + fn != 0 else 0
+                fpr = fp / (fp + tn) if fp + tn != 0 else 0
+                xarr.append(fpr)
+                yarr.append(tpr)
+            metric = 1 + np.trapezoid(yarr, xarr)
+        return metric
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         predict = self.predict(x)
-        return (y / predict - (1 - y) / (1 - predict)) @ x, np.sum(y / predict - (1 - y) / (1 - predict))
+        return -x.T @ (y - predict) / y.size, -np.mean(y - predict)
 
 
 class Exercise:
@@ -67,8 +99,27 @@ class Exercise:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _ in range(n_iter):
-            gradweight, gradbias = model.grad(x, y)
-            model.weights -= lr * gradweight
-            model.bias -= lr * gradbias
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int | None = None,
+    ) -> None:
+        if batch_size is None:
+            for _ in range(n_epoch):
+                dw, db = model.grad(x, y)
+                model.weights -= lr * dw
+                model.bias -= lr * db
+        else:
+            for _ in range(n_epoch):
+                for i in range(0, y.size, batch_size):
+                    dw, db = model.grad(x[i : i + batch_size], y[i : i + batch_size])
+                    model.weights -= lr * dw
+                    model.bias -= lr * db
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        # Для 25 эпох, по метрике AUROC
+        return {"lr": 0.42, "batch_size": 42}

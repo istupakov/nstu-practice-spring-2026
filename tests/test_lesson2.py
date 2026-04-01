@@ -305,7 +305,7 @@ class TestLogisticPart2:
         if metric == "accuracy":
             expected_metric = accuracy_score(y, y_pred)
         if metric == "precision":
-            expected_metric = precision_score(y, y_pred)
+            expected_metric = precision_score(y, y_pred, zero_division=0.0)
         if metric == "recall":
             expected_metric = recall_score(y, y_pred)
         if metric == "F1":

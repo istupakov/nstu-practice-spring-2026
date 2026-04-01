@@ -41,9 +41,45 @@ class LogisticRegression:
         p = np.clip(self.predict(x), eps, 1 - eps)
         return np.mean(-(y * np.log(p) + (1 - y) * np.log(1 - p)))
 
-    def metric(self, x: np.ndarray, y: np.ndarray) -> float:
-        solution_predict = np.mean((self.predict(x) >= 0.5).astype(int) == y)
-        return solution_predict
+    def metric(self, x: np.ndarray, y: np.ndarray, type: str = "accuracy") -> float:
+        pred = self.predict(x)
+        solution_pred = pred >= 0.5
+
+        TP = np.sum((solution_pred == 1) & (y == 1))
+        TN = np.sum((solution_pred == 0) & (y == 0))
+        FP = np.sum((solution_pred == 1) & (y == 0))
+        FN = np.sum((solution_pred == 0) & (y == 1))
+
+        if type == "accuracy":
+            return ((TP + TN) / (TP + FP + TN + FN)) if (TP + FP + TN + FN) != 0 else 0.0
+        elif type == "precision":
+            return (TP / (TP + FP)) if (TP + FP) != 0 else 0.0
+        elif type == "recall":
+            return (TP / (TP + FN)) if (TP + FN) != 0 else 0.0
+        elif type == "F1":
+            return (TP / (TP + 0.5 * (FP + FN))) if (TP + 0.5 * (FP + FN)) != 0 else 0.0
+        else:
+            x_arr = []
+            y_arr = []
+
+            P = np.sum(y == 1)
+            N = np.sum(y == 0)
+
+            if P == 0 or N == 0:
+                return 0.5
+
+            for segment in np.linspace(1.0, 0.0, 1000):
+                TP_ = np.sum(pred[y == 1] >= segment)
+                FP_ = np.sum(pred[y == 0] >= segment)
+
+                TPR = TP_ / P
+                FPR = FP_ / N
+
+                x_arr.append(FPR)
+                y_arr.append(TPR)
+
+            return np.trapezoid(y_arr, x_arr)
+        return 0
 
     def grad(self, x, y) -> tuple[np.ndarray, np.ndarray]:
         dw = (x.T @ (self.predict(x) - y)) / len(y)
@@ -69,8 +105,27 @@ class Exercise:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def fit(model: LinearRegression | LogisticRegression, x: np.ndarray, y: np.ndarray, lr: float, n_iter: int) -> None:
-        for _ in range(n_iter):
-            dw, db = model.grad(x, y)
-            model.weights -= lr * dw
-            model.bias -= lr * db
+    def fit(
+        model: LinearRegression | LogisticRegression,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int | None = None,
+    ) -> None:
+        if batch_size is None:
+            for _ in range(n_epoch):
+                dw, db = model.grad(x, y)
+                model.weights -= lr * dw
+                model.bias -= lr * db
+        else:
+            for _ in range(n_epoch):
+                for i in range(0, len(x), batch_size):
+                    dw, db = model.grad(x[i : i + batch_size], y[i : i + batch_size])
+                    model.weights -= lr * dw
+                    model.bias -= lr * db
+
+    @staticmethod
+    def get_iris_hyperparameters() -> dict[str, int | float]:
+        # Для 25 эпох, по метрике AUROC
+        return {"lr": 0.0001, "batch_size": 25}
