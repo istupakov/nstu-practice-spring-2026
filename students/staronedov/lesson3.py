@@ -16,6 +16,12 @@ class Layer(Protocol):
     def grad(self) -> Sequence[np.ndarray]: ...
 
 
+class Loss(Protocol):
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray: ...
+
+    def backward(self) -> np.ndarray: ...
+
+
 class LinearLayer(Layer):
     def __init__(self, in_features: int, out_features: int, rng: np.random.Generator | None = None) -> None:
         if rng is None:
@@ -131,6 +137,74 @@ class Model(Layer):
         return tuple(grads)
 
 
+class MSELoss(Loss):
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x = x
+        self.y = y
+        return (np.sum((y - x) ** 2)) / y.size
+
+    def backward(self) -> np.ndarray:
+        return (2 * (self.x - self.y)) / self.y.size
+
+
+class BCELoss(Loss):
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x = x
+        self.y = y
+        self.n = x.shape[0]
+        return -(np.sum(y * np.log(x) + (1 - y) * np.log(1 - x)) / y.size)
+
+    def backward(self) -> np.ndarray:
+        return -((self.y - self.x) / (self.x * (1 - self.x))) / self.n
+
+
+class NLLLoss(Loss):
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x = x
+        self.y = y
+        self.n = x.shape[0]
+
+        if y.ndim == 1:
+            return -np.sum(x[np.arange(self.n), y.astype(int)]) / self.n
+        else:
+            return -np.sum(x * y)
+
+    def backward(self) -> np.ndarray:
+        if self.y.ndim == 1:
+            grad = np.zeros_like(self.x)
+
+            grad[np.arange(self.n), self.y.astype(int)] = -1 / self.n
+
+            return grad
+        else:
+            return -self.y / self.n
+
+
+class CrossEntropyLoss(Loss):
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x = x
+        self.y = y
+        self.n = x.shape[0]
+
+        c = np.max(x, axis=-1, keepdims=True)
+        self.lsm = x - c - np.log(np.sum(np.exp(x - c), axis=-1, keepdims=True))
+        if y.ndim == 1:
+            return -np.sum(self.lsm[np.arange(self.n), y.astype(int)]) / self.n
+        else:
+            return -np.sum(self.lsm * y)
+
+    def backward(self) -> np.ndarray:
+        if self.y.ndim == 1:
+            grad = np.exp(self.lsm)
+            grad[np.arange(self.n), self.y.astype(int)] -= 1
+
+            return grad / self.n
+        else:
+            grad = np.exp(self.lsm)
+            grad -= self.y
+            return grad / self.n
+
+
 class Exercise:
     @staticmethod
     def get_student() -> str:
@@ -159,3 +233,42 @@ class Exercise:
     @staticmethod
     def create_model(*layers: Layer) -> Layer:
         return Model(*layers)
+
+    @staticmethod
+    def create_mse_loss() -> Loss:
+        return MSELoss()
+
+    @staticmethod
+    def create_bce_loss() -> Loss:
+        return BCELoss()
+
+    @staticmethod
+    def create_nll_loss() -> Loss:
+        return NLLLoss()
+
+    @staticmethod
+    def create_cross_entropy_loss() -> Loss:
+        return CrossEntropyLoss()
+
+    @staticmethod
+    def train_model(
+        model: Layer, loss: Loss, x: np.ndarray, y: np.ndarray, lr: float, n_epoch: int, batch_size: int
+    ) -> None:
+        n_samples = x.shape[0]
+        indices = np.arange(n_samples)
+        x_shuffled = x[indices]
+        y_shuffled = y[indices]
+
+        for _ in range(n_epoch):
+            for i in range(0, n_samples, batch_size):
+                x_batch = x_shuffled[i : i + batch_size]
+                y_batch = y_shuffled[i : i + batch_size]
+
+                predictions = model.forward(x_batch)
+                loss.forward(predictions, y_batch)
+
+                d_loss = loss.backward()
+                model.backward(d_loss)
+
+                for param, grad in zip(model.parameters, model.grad, strict=True):
+                    param -= lr * grad
