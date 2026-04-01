@@ -15,10 +15,12 @@ class Layer(Protocol):
     @property
     def grad(self) -> Sequence[np.ndarray]: ...
 
+
 class Loss(Protocol):
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray: ...
 
     def backward(self) -> np.ndarray: ...
+
 
 class LinearLayer(Layer):
     def __init__(self, in_features: int, out_features: int, rng: np.random.Generator | None = None) -> None:
@@ -136,6 +138,7 @@ class Model(Layer):
     def grad(self) -> Sequence[np.ndarray]:
         return [g for layer in self.layers for g in layer.grad]
 
+
 class MSELoss(Loss):
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         self.x = x
@@ -146,11 +149,12 @@ class MSELoss(Loss):
         num_elements = self.x.size
         return 2 * (self.x - self.y) / num_elements
 
+
 class BCELoss(Loss):
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         self.x = x
         self.y = y
-        
+
         return -np.mean(self.y * np.log(self.x) + (1 - self.y) * np.log(1 - self.x))
 
     def backward(self) -> np.ndarray:
@@ -163,14 +167,14 @@ class NLLLoss(Loss):
         self.grad = np.zeros_like(x)
         self.grad[np.arange(batch_size), y] = -1 / batch_size
         return -np.mean(x[np.arange(batch_size), y])
-    
+
     def backward(self) -> np.ndarray:
         return self.grad
 
 
 class CrossEntropyLoss(Loss):
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        max_x= np.max(x, axis=-1, keepdims=True)
+        max_x = np.max(x, axis=-1, keepdims=True)
         log_softmax = x - max_x - np.log(np.sum(np.exp(x - max_x), axis=-1, keepdims=True))
 
         self.p = np.exp(log_softmax)
@@ -185,6 +189,7 @@ class CrossEntropyLoss(Loss):
         grad[np.arange(batch_size), self.y] -= 1.0
 
         return grad / batch_size
+
 
 class Exercise:
     @staticmethod
@@ -248,4 +253,3 @@ class Exercise:
 
                 for param, grad in zip(model.parameters, model.grad, strict=True):
                     param -= lr * grad
-
