@@ -210,9 +210,7 @@ class CrossEntropyLoss(Loss):
         row_count = x.shape[0]
 
         stabilized_logits = x - np.max(x, axis=-1, keepdims=True)
-        log_probability_matrix = stabilized_logits - np.log(
-            np.sum(np.exp(stabilized_logits), axis=-1, keepdims=True)
-        )
+        log_probability_matrix = stabilized_logits - np.log(np.sum(np.exp(stabilized_logits), axis=-1, keepdims=True))
 
         class_indicator = np.zeros_like(x)
         class_indicator[np.arange(row_count), y] = 1
