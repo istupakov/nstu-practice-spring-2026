@@ -27,23 +27,23 @@ class LinearLayer(Layer):
         if rng is None:
             rng = np.random.default_rng()
 
-        k = np.sqrt(1 / in_features)
-        self.weights = rng.uniform(-k, k, (out_features, in_features)).astype(np.float32)
-        self.bias = rng.uniform(-k, k, out_features).astype(np.float32)
+        scale = np.sqrt(1 / in_features)
+        self.weights = rng.uniform(-scale, scale, (out_features, in_features)).astype(np.float32)
+        self.bias = rng.uniform(-scale, scale, out_features).astype(np.float32)
 
-        self._d_weights = np.zeros_like(self.weights)
-        self._d_bias = np.zeros_like(self.bias)
-        self._input_cache = np.array([])
+        self._weight_gradient = np.zeros_like(self.weights)
+        self._bias_gradient = np.zeros_like(self.bias)
+        self._saved_input = np.array([])
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        self._input_cache = x
+        self._saved_input = x
         return x @ self.weights.T + self.bias
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        self._d_weights = dy.T @ self._input_cache
-        self._d_bias = np.sum(dy, axis=0)
-        dx = dy @ self.weights
-        return dx
+        self._weight_gradient = dy.T @ self._saved_input
+        self._bias_gradient = np.sum(dy, axis=0)
+        propagated_gradient = dy @ self.weights
+        return propagated_gradient
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
@@ -51,19 +51,19 @@ class LinearLayer(Layer):
 
     @property
     def grad(self) -> Sequence[np.ndarray]:
-        return (self._d_weights, self._d_bias)
+        return (self._weight_gradient, self._bias_gradient)
 
 
 class ReLULayer(Layer):
     def __init__(self) -> None:
-        self._active_mask = np.array([])
+        self._positive_mask = np.array([])
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        self._active_mask = (x > 0).astype(x.dtype)
-        return x * self._active_mask
+        self._positive_mask = (x > 0).astype(x.dtype)
+        return x * self._positive_mask
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        return dy * self._active_mask
+        return dy * self._positive_mask
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
@@ -76,14 +76,14 @@ class ReLULayer(Layer):
 
 class SigmoidLayer(Layer):
     def __init__(self) -> None:
-        self._activated_val = np.array([])
+        self._saved_output = np.array([])
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        self._activated_val = 1.0 / (1.0 + np.exp(-np.clip(x, -250, 250)))
-        return self._activated_val
+        self._saved_output = 1.0 / (1.0 + np.exp(-np.clip(x, -250, 250)))
+        return self._saved_output
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        return dy * self._activated_val * (1.0 - self._activated_val)
+        return dy * self._saved_output * (1.0 - self._saved_output)
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
@@ -96,20 +96,20 @@ class SigmoidLayer(Layer):
 
 class LogSoftmaxLayer(Layer):
     def __init__(self) -> None:
-        self._softmax_probs = np.array([])
+        self._probability_cache = np.array([])
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        x_max = np.max(x, axis=-1, keepdims=True)
-        shifted_x = x - x_max
-        exp_vals = np.exp(shifted_x)
-        sum_exp = np.sum(exp_vals, axis=-1, keepdims=True)
+        max_per_row = np.max(x, axis=-1, keepdims=True)
+        stabilized_logits = x - max_per_row
+        exponentials = np.exp(stabilized_logits)
+        exponential_sum = np.sum(exponentials, axis=-1, keepdims=True)
 
-        self._softmax_probs = exp_vals / sum_exp
-        return shifted_x - np.log(sum_exp)
+        self._probability_cache = exponentials / exponential_sum
+        return stabilized_logits - np.log(exponential_sum)
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        sum_dy = np.sum(dy, axis=-1, keepdims=True)
-        return dy - self._softmax_probs * sum_dy
+        gradient_sum = np.sum(dy, axis=-1, keepdims=True)
+        return dy - self._probability_cache * gradient_sum
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
@@ -122,101 +122,107 @@ class LogSoftmaxLayer(Layer):
 
 class Model(Layer):
     def __init__(self, *layers: Layer) -> None:
-        self._sequence = layers
+        self._layers = layers
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        current_x = x
-        for layer in self._sequence:
-            current_x = layer.forward(current_x)
-        return current_x
+        current_tensor = x
+        for current_layer in self._layers:
+            current_tensor = current_layer.forward(current_tensor)
+        return current_tensor
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        current_dy = dy
-        for layer in reversed(self._sequence):
-            current_dy = layer.backward(current_dy)
-        return current_dy
+        current_gradient = dy
+        for current_layer in reversed(self._layers):
+            current_gradient = current_layer.backward(current_gradient)
+        return current_gradient
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
-        params = []
-        for layer in self._sequence:
-            params.extend(layer.parameters)
-        return tuple(params)
+        collected_parameters = []
+        for current_layer in self._layers:
+            collected_parameters.extend(current_layer.parameters)
+        return tuple(collected_parameters)
 
     @property
     def grad(self) -> Sequence[np.ndarray]:
-        grads = []
-        for layer in self._sequence:
-            grads.extend(layer.grad)
-        return tuple(grads)
+        collected_gradients = []
+        for current_layer in self._layers:
+            collected_gradients.extend(current_layer.grad)
+        return tuple(collected_gradients)
 
 
 class MSELoss(Loss):
     def __init__(self) -> None:
-        self._x = np.array([])
-        self._y = np.array([])
+        self._prediction_cache = np.array([])
+        self._target_cache = np.array([])
 
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        self._x = x
-        self._y = y
+        self._prediction_cache = x
+        self._target_cache = y
         return np.array(np.mean((x - y) ** 2), dtype=np.float32)
 
     def backward(self) -> np.ndarray:
-        return 2.0 * (self._x - self._y) / self._x.size
+        return 2.0 * (self._prediction_cache - self._target_cache) / self._prediction_cache.size
 
 
 class BCELoss(Loss):
     def __init__(self) -> None:
-        self._x = np.array([])
-        self._y = np.array([])
+        self._prediction_cache = np.array([])
+        self._target_cache = np.array([])
 
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        self._x = x
-        self._y = y
-        loss = -np.mean(y * np.log(x) + (1 - y) * np.log(1 - x))
-        return np.array(loss)
+        self._prediction_cache = x
+        self._target_cache = y
+        average_penalty = -np.mean(y * np.log(x) + (1 - y) * np.log(1 - x))
+        return np.array(average_penalty)
 
     def backward(self) -> np.ndarray:
-        batch_size = self._x.shape[0]
-        return (self._x - self._y) / (self._x * (1 - self._x)) / batch_size
+        row_count = self._prediction_cache.shape[0]
+        return (
+            (self._prediction_cache - self._target_cache)
+            / (self._prediction_cache * (1 - self._prediction_cache))
+            / row_count
+        )
 
 
 class NLLLoss(Loss):
     def __init__(self) -> None:
-        self._dx = np.array([])
+        self._stored_gradient = np.array([])
 
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        batch_size = x.shape[0]
-        hot_y = np.zeros_like(x)
-        hot_y[np.arange(batch_size), y] = 1
-        self._dx = -hot_y / batch_size
-        loss = -np.sum(x * hot_y) / batch_size
-        return np.array(loss, dtype=np.float32)
+        row_count = x.shape[0]
+        class_indicator = np.zeros_like(x)
+        class_indicator[np.arange(row_count), y] = 1
+        self._stored_gradient = -class_indicator / row_count
+        total_penalty = -np.sum(x * class_indicator) / row_count
+        return np.array(total_penalty, dtype=np.float32)
 
     def backward(self) -> np.ndarray:
-        return self._dx
+        return self._stored_gradient
 
 
 class CrossEntropyLoss(Loss):
     def __init__(self) -> None:
-        self._dx = np.array([])
-        self._loss = np.array(0.0)
+        self._stored_gradient = np.array([])
+        self._stored_loss = np.array(0.0)
 
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        batch_size = x.shape[0]
+        row_count = x.shape[0]
 
-        shifted = x - np.max(x, axis=-1, keepdims=True)
-        logprobs = shifted - np.log(np.sum(np.exp(shifted), axis=-1, keepdims=True))
+        stabilized_logits = x - np.max(x, axis=-1, keepdims=True)
+        log_probability_matrix = stabilized_logits - np.log(
+            np.sum(np.exp(stabilized_logits), axis=-1, keepdims=True)
+        )
 
-        hot_y = np.zeros_like(x)
-        hot_y[np.arange(batch_size), y] = 1
+        class_indicator = np.zeros_like(x)
+        class_indicator[np.arange(row_count), y] = 1
 
-        self._loss = -np.sum(logprobs * hot_y) / batch_size
-        self._dx = (np.exp(logprobs) - hot_y) / batch_size
-        return np.array(self._loss)
+        self._stored_loss = -np.sum(log_probability_matrix * class_indicator) / row_count
+        self._stored_gradient = (np.exp(log_probability_matrix) - class_indicator) / row_count
+        return np.array(self._stored_loss)
 
     def backward(self) -> np.ndarray:
-        return self._dx
+        return self._stored_gradient
 
 
 class Exercise:
@@ -268,12 +274,17 @@ class Exercise:
     def train_model(
         model: Layer, loss: Loss, x: np.ndarray, y: np.ndarray, lr: float, n_epoch: int, batch_size: int
     ) -> None:
-        idx = np.arange(batch_size, x.shape[0], batch_size)
+        split_points = np.arange(batch_size, x.shape[0], batch_size)
 
         for _ in range(n_epoch):
-            for x_batch, y_batch in zip(np.split(x, idx, axis=0), np.split(y, idx, axis=0), strict=True):
-                loss.forward(model.forward(x_batch), y_batch)
-                model.backward(loss.backward())
+            input_parts = np.split(x, split_points, axis=0)
+            target_parts = np.split(y, split_points, axis=0)
 
-                for p, g in zip(model.parameters, model.grad, strict=True):
-                    p += -lr * g
+            for feature_block, target_block in zip(input_parts, target_parts, strict=True):
+                model_output = model.forward(feature_block)
+                loss.forward(model_output, target_block)
+                initial_gradient = loss.backward()
+                model.backward(initial_gradient)
+
+                for parameter_tensor, gradient_tensor in zip(model.parameters, model.grad, strict=True):
+                    parameter_tensor += -lr * gradient_tensor
