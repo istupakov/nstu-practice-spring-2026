@@ -181,7 +181,6 @@ class BCELoss(Loss):
         return (self._x - self._y) / (self._x * (1 - self._x)) / batch_size
 
 
-
 class NLLLoss(Loss):
     def __init__(self) -> None:
         self._dx = np.array([])
