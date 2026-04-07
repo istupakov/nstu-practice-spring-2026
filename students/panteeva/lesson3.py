@@ -226,14 +226,11 @@ class Exercise:
         model: Layer, loss: Loss, x: np.ndarray, y: np.ndarray, lr: float, n_epoch: int, batch_size: int
     ) -> None:
         n_samples = x.shape[0]
-        indices = np.arange(n_samples)
-        x_train = x[indices]
-        y_train = y[indices]
 
         for _ in range(n_epoch):
             for start in range(0, n_samples, batch_size):
-                x_batch = x_train[start : start + batch_size]
-                y_batch = y_train[start : start + batch_size]
+                x_batch = x[start : start + batch_size]
+                y_batch = y[start : start + batch_size]
 
                 predictions = model.forward(x_batch)
                 loss.forward(predictions, y_batch)
