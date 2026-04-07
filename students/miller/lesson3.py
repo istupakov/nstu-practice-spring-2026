@@ -271,17 +271,17 @@ class Exercise:
         return Model(*layers)
 
     @staticmethod
-    def create_MSELoss() -> Loss:
+    def create_mse_loss() -> Loss:
         return MSELoss()
 
     @staticmethod
-    def create_BCELoss() -> Loss:
+    def create_bce_loss() -> Loss:
         return BCELoss()
 
     @staticmethod
-    def create_NLLLoss() -> Loss:
+    def create_nll_loss() -> Loss:
         return NLLLoss()
 
     @staticmethod
-    def create_CELoss() -> Loss:
+    def create_cross_entropy_loss() -> Loss:
         return CELoss()
