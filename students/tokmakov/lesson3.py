@@ -282,26 +282,12 @@ class Exercise:
         n_epoch: int,
         batch_size: int,
     ) -> None:
-        print("train_model started")
-        n_objects = x.shape[0]
+        idx = np.arange(batch_size, x.shape[0], batch_size)
 
         for _ in range(n_epoch):
-            perm = np.random.permutation(n_objects)
-            x_shuffled = x[perm]
-            y_shuffled = y[perm]
+            for x_batch, y_batch in zip(np.split(x, idx, axis=0), np.split(y, idx, axis=0), strict=True):
+                loss.forward(model.forward(x_batch), y_batch)
+                model.backward(loss.backward())
 
-            for start_idx in range(0, n_objects, batch_size):
-                end_idx = start_idx + batch_size
-
-                x_batch = x_shuffled[start_idx:end_idx]
-                y_batch = y_shuffled[start_idx:end_idx]
-
-                y_pred = model.forward(x_batch)
-
-                loss.forward(y_pred, y_batch)
-                dL_dy = loss.backward()
-
-                model.backward(dL_dy)
-
-                for param, grad in zip(model.parameters, model.grad, strict=True):
-                    param -= lr * grad
+                for p, g in zip(model.parameters, model.grad, strict=True):
+                    p += -lr * g
