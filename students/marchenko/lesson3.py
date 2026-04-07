@@ -347,22 +347,19 @@ class Exercise:
         shuffle: bool = False,
     ) -> None:
         n_samples = x.shape[0]
-        for _ in range(n_epoch):
-            if shuffle:
-                indices = np.random.permutation(n_samples)
-                x_shuffled = x[indices]
-                y_shuffled = y[indices]
-            else:
-                x_shuffled = x
-                y_shuffled = y
+        if shuffle:
+            indices = np.random.permutation(n_samples)
+            x = x[indices]
+            y = y[indices]
 
+        for _ in range(n_epoch):
             for start_idx in range(0, n_samples, batch_size):
                 # Вычисляем конец батча
                 end_idx = min(start_idx + batch_size, n_samples)
 
                 # Вырезаем текущий батч
-                x_batch = x_shuffled[start_idx:end_idx]
-                y_batch = y_shuffled[start_idx:end_idx]
+                x_batch = x[start_idx:end_idx]
+                y_batch = y[start_idx:end_idx]
 
                 # Данные проходят через все слои модели
                 predictions = model.forward(x_batch)

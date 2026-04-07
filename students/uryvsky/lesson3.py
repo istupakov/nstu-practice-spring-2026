@@ -23,47 +23,38 @@ class LinearLayer(Layer):
         k = np.sqrt(1 / in_features)
         self.weights = rng.uniform(-k, k, (out_features, in_features)).astype(np.float32)
         self.bias = rng.uniform(-k, k, out_features).astype(np.float32)
-
-        self._input_cache: np.ndarray | None = None
-        self._grad_weights: np.ndarray | None = None
-        self._grad_bias: np.ndarray | None = None
+        self.x = None
+        self.dw = np.zeros_like(self.weights)
+        self.db = np.zeros_like(self.bias)
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        self._input_cache = x
+        self.x = x
         return x @ self.weights.T + self.bias
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        if self._input_cache is None:
-            raise RuntimeError("LinearLayer: forward() must be called before backward()")
-
-        self._grad_weights = dy.T @ self._input_cache
-        self._grad_bias = np.sum(dy, axis=0)
-
+        self.dw = dy.T @ self.x
+        self.db = np.sum(dy, axis=0)
         return dy @ self.weights
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
-        return [self.weights, self.bias]
+        return self.weights, self.bias
 
     @property
     def grad(self) -> Sequence[np.ndarray]:
-        if self._grad_weights is None or self._grad_bias is None:
-            raise RuntimeError("LinearLayer: backward() must be called before accessing grad")
-        return [self._grad_weights, self._grad_bias]
+        return self.dw, self.db
 
 
 class ReLULayer(Layer):
     def __init__(self) -> None:
-        self._mask_cache: np.ndarray | None = None
+        self.mask: np.ndarray
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        self._mask_cache = x > 0
-        return np.maximum(0, x)
+        self.mask = x > 0
+        return x * self.mask
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        if self._mask_cache is None:
-            raise RuntimeError("ReLULayer: forward() must be called before backward()")
-        return dy * self._mask_cache
+        return dy * self.mask
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
@@ -76,19 +67,14 @@ class ReLULayer(Layer):
 
 class SigmoidLayer(Layer):
     def __init__(self) -> None:
-        self._output_cache: np.ndarray | None = None
+        self.sgm_out: np.ndarray
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        output = 1 / (1 + np.exp(-x))
-        self._output_cache = output
-        return output
+        self.sgm_out = 1 / (1 + np.exp(-x))
+        return self.sgm_out
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        if self._output_cache is None:
-            raise RuntimeError("SigmoidLayer: forward() must be called before backward()")
-
-        sigmoid_x = self._output_cache
-        return dy * sigmoid_x * (1 - sigmoid_x)
+        return dy * self.sgm_out * (1 - self.sgm_out)
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
@@ -100,24 +86,19 @@ class SigmoidLayer(Layer):
 
 
 class LogSoftmaxLayer(Layer):
-    def __init__(self, axis: int = -1) -> None:
-        self._axis = axis
-        self._softmax_cache: np.ndarray | None = None
+    def __init__(self) -> None:
+        self.softmax: np.ndarray
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        x_max = np.max(x, axis=self._axis, keepdims=True)
-        exp_shifted = np.exp(x - x_max)
-        sum_exp = np.sum(exp_shifted, axis=self._axis, keepdims=True)
-
-        self._softmax_cache = exp_shifted / sum_exp
-        return (x - x_max) - np.log(sum_exp)
+        x_solu = x - np.max(x, axis=-1, keepdims=True)
+        exp_x = np.exp(x_solu)
+        sum_exp = np.sum(exp_x, axis=-1, keepdims=True)
+        self.softmax = exp_x / sum_exp
+        return x_solu - np.log(sum_exp)
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        if self._softmax_cache is None:
-            raise RuntimeError("LogSoftmaxLayer: forward() must be called before backward()")
-
-        sum_dy = np.sum(dy, axis=self._axis, keepdims=True)
-        return dy - self._softmax_cache * sum_dy
+        sum_dy = np.sum(dy, axis=-1, keepdims=True)
+        return dy - self.softmax * sum_dy
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
@@ -129,8 +110,8 @@ class LogSoftmaxLayer(Layer):
 
 
 class Model(Layer):
-    def __init__(self, *layers: Layer) -> None:
-        self.layers = list(layers)
+    def __init__(self, *layer: Layer):
+        self.layers = layer
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         for layer in self.layers:
@@ -160,7 +141,7 @@ class Model(Layer):
 class Exercise:
     @staticmethod
     def get_student() -> str:
-        return "Кудрявцев Павел Павлович, ПМ-35"
+        return "Урывский Александр Александрович, ПМ-31"
 
     @staticmethod
     def get_topic() -> str:
