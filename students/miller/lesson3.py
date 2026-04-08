@@ -36,7 +36,6 @@ class LinearLayer(Layer):
         self.dbias = np.zeros_like(self.bias)
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-
         self.input = x
         return np.dot(x, self.weights.T) + self.bias
 
