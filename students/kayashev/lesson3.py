@@ -16,6 +16,12 @@ class Layer(Protocol):
     def grad(self) -> Sequence[np.ndarray]: ...
 
 
+class Loss(Protocol):
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray: ...
+
+    def backward(self) -> np.ndarray: ...
+
+
 class LinearLayer(Layer):
     def __init__(self, in_features: int, out_features: int, rng: np.random.Generator | None = None) -> None:
         assert rng is not None
@@ -105,6 +111,79 @@ class LogSoftmaxLayer(Layer):
         return ()
 
 
+class MSELoss(Loss):
+    def __init__(self):
+        self.x: np.ndarray
+        self.y: np.ndarray
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x = x
+        self.y = y
+        return np.mean((x - y) ** 2)
+
+    def backward(self) -> np.ndarray:
+        return 2 * (self.x - self.y) / self.y.size
+
+
+class BCELoss(Loss):
+    def __init__(self):
+        self.x: np.ndarray
+        self.y: np.ndarray
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x = x
+        self.y = y
+        return -np.mean(y * np.log(x) + (-y + 1) * np.log(-x + 1))
+
+    def backward(self) -> np.ndarray:
+        return ((self.x - self.y) / (self.x * (1 - self.x))) / self.x.shape[0]
+
+
+class NLLLoss(Loss):
+    def __init__(self):
+        self.x: np.ndarray
+        self.y: np.ndarray
+        self.hot: np.ndarray
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x = x
+        self.y = y
+        self.hot = np.zeros_like(x)
+        self.hot[np.arange(self.x.shape[0]), y] = 1
+        return -np.sum(x * self.hot) / self.x.shape[0]
+
+    def backward(self) -> np.ndarray:
+        return -self.hot / self.x.shape[0]
+
+
+class CrossEntropyLoss(Loss):
+    def __init__(self):
+        self.x: np.ndarray
+        self.y: np.ndarray
+        self.softmax: np.ndarray
+        self.hot: np.ndarray
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x = x
+        self.y = y
+        if y.ndim == 1:
+            self.hot = np.zeros_like(x)
+            self.hot[np.arange(x.shape[0]), y] = 1
+            self.y = y
+        else:
+            self.hot = y
+            self.y = np.argmax(y, axis=1)
+        x_max = np.max(x, axis=-1, keepdims=True)
+        exp_x = np.exp(x - x_max)
+        sum_exp = np.sum(exp_x, axis=-1, keepdims=True)
+        log_softmax = (x - x_max) - np.log(sum_exp)
+        self.softmax = np.exp(log_softmax)
+        return -np.sum(log_softmax * self.hot) / self.x.shape[0]
+
+    def backward(self) -> np.ndarray:
+        return (self.softmax - self.hot) / self.x.shape[0]
+
+
 class Model(Layer):
     def __init__(self, *layers: Layer):
         self.layers = layers
@@ -160,5 +239,53 @@ class Exercise:
         return LogSoftmaxLayer()
 
     @staticmethod
+    def create_mse_loss() -> Loss:
+        return MSELoss()
+
+    @staticmethod
+    def create_bce_loss() -> Loss:
+        return BCELoss()
+
+    @staticmethod
+    def create_nll_loss() -> Loss:
+        return NLLLoss()
+
+    @staticmethod
+    def create_cross_entropy_loss() -> Loss:
+        return CrossEntropyLoss()
+
+    @staticmethod
     def create_model(*layers: Layer) -> Layer:
         return Model(*layers)
+
+    @staticmethod
+    def train_model(
+        model: Layer,
+        loss: Loss,
+        x: np.ndarray,
+        y: np.ndarray,
+        lr: float,
+        n_epoch: int,
+        batch_size: int,
+        shuffle: bool = False,
+    ) -> None:
+        dims = x.shape[0]
+        for _ in range(n_epoch):
+            if shuffle:
+                indices = np.random.permutation(dims)
+                newx = x[indices]
+                newy = y[indices]
+            else:
+                newx = x
+                newy = y
+
+            for start in range(0, dims, batch_size):
+                end_idx = min(start + batch_size, dims)
+                batchx = newx[dims:end_idx]
+                batchy = newy[dims:end_idx]
+                predictions = model.forward(batchx)
+                loss.forward(predictions, batchy)
+                lossback = loss.backward()
+                model.backward(lossback)
+                for param, grad in zip(model.parameters, model.grad, strict=True):
+                    param -= lr * grad
