@@ -16,6 +16,12 @@ class Layer(Protocol):
     def grad(self) -> Sequence[np.ndarray]: ...
 
 
+class Loss(Protocol):
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray: ...
+
+    def backward(self) -> np.ndarray: ...
+
+
 class LinearLayer(Layer):
     def __init__(self, in_features: int, out_features: int, rng: np.random.Generator | None = None) -> None:
         if rng is None:
@@ -146,6 +152,78 @@ class Model(Layer):
         return grads
 
 
+class MSELoss(Loss):
+    def __init__(self):
+        self.x: np.ndarray | None = None
+        self.y: np.ndarray | None = None
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x, self.y = x, y
+        return np.array(np.mean(np.square(x - y)))
+
+    def backward(self) -> np.ndarray:
+        assert self.x is not None and self.y is not None, "MSELoss: incorrect forward and backward order"
+        return 2 * (self.x - self.y) / self.x.size
+
+
+class BCELoss(Loss):
+    """Binary Cross Entropy Loss"""
+
+    def __init__(self):
+        self.x: np.ndarray | None = None
+        self.y: np.ndarray | None = None
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x, self.y = x, y
+        return np.array(-np.mean(y * np.log(self.x) + (1 - y) * np.log(1 - self.x)))
+
+    def backward(self) -> np.ndarray:
+        assert self.x is not None and self.y is not None, "BCELoss: incorrect forward and backward order"
+        znam = self.x * (1 - self.x)
+        assert np.all(znam != 0), "BCELoss: zero elements"
+        return ((self.x - self.y) / znam) / self.x.shape[0]
+
+
+class NLLLoss(Loss):
+    """Negative Log-Likelihood Loss"""
+
+    def __init__(self):
+        self.x: np.ndarray | None = None
+        self.y: np.ndarray | None = None
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        self.x, self.y = x, y
+        cache = x[np.arange(y.shape[0]), y]
+        return np.array(-np.mean(cache))
+
+    def backward(self) -> np.ndarray:
+        assert self.x is not None and self.y is not None, "NLLLoss: incorrect forward and backward order"
+        grad = np.zeros_like(self.x)
+        grad[np.arange(self.y.shape[0]), self.y] = -1.0 / self.y.shape[0]
+        return grad
+
+
+class CrossEntropyLoss(Loss):
+    def __init__(self) -> None:
+        self.gradient = np.array([])
+        self.loss = np.array(0.0)
+
+    def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        shape = x.shape[0]
+        cashe = x - np.max(x, axis=-1, keepdims=True)
+        exp_x = np.exp(cashe)
+        log_softmax = cashe - np.log(np.sum(exp_x, axis=-1, keepdims=True))
+        one_hot = np.zeros_like(x)
+        one_hot[np.arange(shape), y] = 1.0
+        self.loss = -np.sum(log_softmax * one_hot) / shape
+        self.gradient = (np.exp(log_softmax) - one_hot) / shape
+
+        return np.array(self.loss)
+
+    def backward(self) -> np.ndarray:
+        return self.gradient
+
+
 class Exercise:
     @staticmethod
     def get_student() -> str:
@@ -174,3 +252,42 @@ class Exercise:
     @staticmethod
     def create_model(*layers: Layer) -> Layer:
         return Model(*layers)
+
+    @staticmethod
+    def create_mse_loss() -> Loss:
+        return MSELoss()
+
+    @staticmethod
+    def create_bce_loss() -> Loss:
+        return BCELoss()
+
+    @staticmethod
+    def create_nll_loss() -> Loss:
+        return NLLLoss()
+
+    @staticmethod
+    def create_cross_entropy_loss() -> Loss:
+        return CrossEntropyLoss()
+
+    @staticmethod
+    def train_model(
+        model: Layer, loss: Loss, x: np.ndarray, y: np.ndarray, lr: float, n_epoch: int, batch_size: int
+    ) -> None:
+        n = x.shape[0]
+        batch = n if (batch_size is None or batch_size >= n) else batch_size
+
+        for _ in range(n_epoch):
+            for start in range(0, n, batch):
+                end = min(start + batch, n)
+                x_batch = x[start:end]
+                y_batch = y[start:end]
+
+                predict = model.forward(x_batch)
+                loss.forward(predict, y_batch)
+
+                dy = loss.backward()
+                model.backward(dy)
+
+                # Обновление параметров
+                for param, grad in zip(model.parameters, model.grad, strict=True):
+                    param -= lr * grad
