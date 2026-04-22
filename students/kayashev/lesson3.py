@@ -59,7 +59,7 @@ class ReLULayer(Layer):
         return np.maximum(x, 0)
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
-        return dy * np.sign(np.maximum(self.x, 0))
+        return dy * (self.x > 0).astype(np.float32)
 
     @property
     def parameters(self) -> Sequence[np.ndarray]:
@@ -122,7 +122,7 @@ class MSELoss(Loss):
         return np.mean((x - y) ** 2)
 
     def backward(self) -> np.ndarray:
-        return 2 * (self.x - self.y) / self.y.size
+        return 2 * (self.x - self.y) / self.x.size
 
 
 class BCELoss(Loss):
@@ -160,7 +160,7 @@ class CrossEntropyLoss(Loss):
     def __init__(self):
         self.x: np.ndarray
         self.y: np.ndarray
-        self.softmax: np.ndarray
+        self.log_softmax: np.ndarray
         self.hot: np.ndarray
 
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -174,14 +174,14 @@ class CrossEntropyLoss(Loss):
             self.hot = y
             self.y = np.argmax(y, axis=1)
         x_max = np.max(x, axis=-1, keepdims=True)
-        exp_x = np.exp(x - x_max)
-        sum_exp = np.sum(exp_x, axis=-1, keepdims=True)
-        log_softmax = (x - x_max) - np.log(sum_exp)
-        self.softmax = np.exp(log_softmax)
-        return -np.sum(log_softmax * self.hot) / self.x.shape[0]
+        shifted_x = x - x_max
+        sum_exp = np.sum(np.exp(shifted_x), axis=-1, keepdims=True)
+        self.log_softmax = shifted_x - np.log(sum_exp)
+        return -np.sum(self.log_softmax * self.hot) / self.x.shape[0]
 
     def backward(self) -> np.ndarray:
-        return (self.softmax - self.hot) / self.x.shape[0]
+        softmax = np.exp(self.log_softmax)
+        return (softmax - self.hot) / self.x.shape[0]
 
 
 class Model(Layer):
@@ -270,6 +270,7 @@ class Exercise:
         shuffle: bool = False,
     ) -> None:
         dims = x.shape[0]
+
         for _ in range(n_epoch):
             if shuffle:
                 indices = np.random.permutation(dims)
@@ -278,12 +279,12 @@ class Exercise:
             else:
                 newx = x
                 newy = y
-
             for start in range(0, dims, batch_size):
                 end_idx = min(start + batch_size, dims)
-                batchx = newx[dims:end_idx]
-                batchy = newy[dims:end_idx]
+                batchx = newx[start:end_idx]
+                batchy = newy[start:end_idx]
                 predictions = model.forward(batchx)
+                # print("Test ",predictions,"\n")
                 loss.forward(predictions, batchy)
                 lossback = loss.backward()
                 model.backward(lossback)
