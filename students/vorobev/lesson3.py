@@ -146,13 +146,13 @@ class NLLLoss(Loss):
         self.y_true: np.ndarray
         self.n: int
 
-    def forward(self, log_probs: np.ndarray, y_true: np.ndarray) -> float:
-        self.log_probs = log_probs
+    def forward(self, y_pred: np.ndarray, y_true: np.ndarray) -> float:
+        self.log_probs = y_pred
         self.y_true = y_true
         self.n = y_true.shape[0]
-        hot_y = np.zeros_like(log_probs)
+        hot_y = np.zeros_like(y_pred)
         hot_y[np.arange(self.n), y_true] = 1.0
-        return -np.sum(log_probs * hot_y) / self.n
+        return -np.sum(y_pred * hot_y) / self.n
 
     def backward(self) -> np.ndarray:
         hot_y = np.zeros_like(self.log_probs)
@@ -167,17 +167,17 @@ class CrossEntropyLoss(Loss):
         self.y_true: np.ndarray
         self.batch_size: int
 
-    def forward(self, logits: np.ndarray, y_true: np.ndarray) -> float:
-        self.logits = logits
+    def forward(self, y_pred: np.ndarray, y_true: np.ndarray) -> float:
+        self.logits = y_pred
         self.y_true = y_true
         self.batch_size = y_true.shape[0]
 
-        x_max = np.max(logits, axis=-1, keepdims=True)
-        exp_shifted = np.exp(logits - x_max)
+        x_max = np.max(y_pred, axis=-1, keepdims=True)
+        exp_shifted = np.exp(y_pred - x_max)
         log_sum_exp = np.log(np.sum(exp_shifted, axis=-1, keepdims=True))
-        self.log_probs = logits - x_max - log_sum_exp
+        self.log_probs = y_pred - x_max - log_sum_exp
 
-        hot_y = np.zeros_like(logits)
+        hot_y = np.zeros_like(y_pred)
         hot_y[np.arange(self.batch_size), y_true] = 1.0
         return -np.sum(self.log_probs * hot_y) / self.batch_size
 
@@ -270,10 +270,10 @@ class Exercise:
             for i in range(0, len(x), batch_size):
                 x_b = x[i : i + batch_size]
                 y_b = y[i : i + batch_size]
-                
+
                 out = model.forward(x_b)
                 loss.forward(out, y_b)
                 model.backward(loss.backward())
-                
+
                 for p, g in zip(model.parameters, model.grad, strict=True):
                     p -= g * lr
