@@ -64,7 +64,6 @@ class ReLULayer(Layer):
     def backward(self, dy: np.ndarray) -> np.ndarray:
         if self.input is None:
             raise RuntimeError
-
         return dy * (self.input > 0)
 
     @property
@@ -87,7 +86,6 @@ class SigmoidLayer(Layer):
     def backward(self, dy: np.ndarray) -> np.ndarray:
         if self.output is None:
             raise RuntimeError
-
         return dy * self.output * (1 - self.output)
 
     @property
@@ -193,28 +191,24 @@ class BCELoss(Loss):
 
     def backward(self) -> np.ndarray:
         x = np.clip(self.x, self.eps, 1 - self.eps)
-        n = self.x.size
-        return (x - self.y) / (x * (1 - x)) / n
+        batch_size = self.x.shape[0]
+        return (x - self.y) / (x * (1 - x)) / batch_size
 
 
 class NLLLoss(Loss):
     def __init__(self) -> None:
         self.x: np.ndarray = np.empty(0, dtype=np.float32)
         self.y: np.ndarray = np.empty(0, dtype=np.int64)
-        self.grad: np.ndarray = np.empty(0, dtype=np.float32)
 
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         self.x = x
         self.y = y
-
         return np.array(-np.mean(x[np.arange(x.shape[0]), y]), dtype=np.float32)
 
     def backward(self) -> np.ndarray:
         N = self.x.shape[0]
-
         grad = np.zeros_like(self.x, dtype=np.float32)
         grad[np.arange(N), self.y] = -1.0 / N
-
         return grad
 
 
@@ -223,20 +217,28 @@ class CELoss(Loss):
         self.x: np.ndarray = np.empty(0, dtype=np.float32)
         self.y: np.ndarray = np.empty(0, dtype=np.int64)
         self.eps = eps
+        self.log_softmax: np.ndarray = np.empty(0, dtype=np.float32)
 
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         self.x = x
         self.y = y
 
-        x = np.clip(x, self.eps, 1 - self.eps)
-        return np.array(-np.mean(np.log(x[np.arange(x.shape[0]), y])))
+        max_vals = np.max(x, axis=-1, keepdims=True)
+        shifted = x - max_vals
+        exp_shifted = np.exp(shifted)
+        sum_exp = np.sum(exp_shifted, axis=-1, keepdims=True)
+        self.log_softmax = shifted - np.log(sum_exp)
+
+        n = x.shape[0]
+        loss = -np.mean(self.log_softmax[np.arange(n), y])
+        return np.array(loss, dtype=np.float32)
 
     def backward(self) -> np.ndarray:
         n = self.x.shape[0]
-
-        grad = np.zeros_like(self.x)
-        grad[np.arange(n), self.y] = -1.0 / (self.x[np.arange(n), self.y] * n)
-
+        softmax = np.exp(self.log_softmax)
+        grad = softmax.copy()
+        grad[np.arange(n), self.y] -= 1.0
+        grad /= n
         return grad
 
 
@@ -284,3 +286,33 @@ class Exercise:
     @staticmethod
     def create_cross_entropy_loss() -> Loss:
         return CELoss()
+
+    @staticmethod
+    def train_model(
+        model: Layer, loss: Loss, x: np.ndarray, y: np.ndarray, lr: float, n_epoch: int, batch_size: int
+    ) -> None:
+        n_samples = x.shape[0]
+
+        for epoch in range(n_epoch):
+            total_loss = 0.0
+            n_batches = 0
+
+            for start in range(0, n_samples, batch_size):
+                end = min(start + batch_size, n_samples)
+                x_batch = x[start:end]
+                y_batch = y[start:end]
+
+                out = model.forward(x_batch)
+                loss_val = loss.forward(out, y_batch)
+
+                d_loss = loss.backward()
+                model.backward(d_loss)
+
+                for param, grad in zip(model.parameters, model.grad, strict=True):
+                    param -= lr * grad
+
+                total_loss += loss_val.item()
+                n_batches += 1
+
+            avg_loss = total_loss / n_batches
+            print(f"Эпоха {epoch + 1:3d}/{n_epoch}, средняя ошибка: {avg_loss:.6f}")
