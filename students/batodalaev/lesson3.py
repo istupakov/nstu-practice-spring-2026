@@ -2,8 +2,8 @@ from collections.abc import Sequence
 
 import numpy as np
 
-
 # ─── Activation / Layer helpers ──────────────────────────────────────────────
+
 
 def _sigmoid(x: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-x))
@@ -15,6 +15,7 @@ def _log_softmax(x: np.ndarray) -> np.ndarray:
 
 
 # ─── Layers ──────────────────────────────────────────────────────────────────
+
 
 class LinearLayer:
     def __init__(self, in_features: int, out_features: int, rng: np.random.Generator | None = None) -> None:
@@ -130,6 +131,7 @@ class Model:
 
 # ─── Loss functions ───────────────────────────────────────────────────────────
 
+
 class MSELoss:
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         self._x = x
@@ -185,6 +187,7 @@ class CrossEntropyLoss:
 
 # ─── Exercise ─────────────────────────────────────────────────────────────────
 
+
 class Exercise:
     @staticmethod
     def get_student() -> str:
@@ -231,9 +234,7 @@ class Exercise:
         return CrossEntropyLoss()
 
     @staticmethod
-    def train_model(
-        model: Model, loss, x: np.ndarray, y: np.ndarray, lr: float, n_epoch: int, batch_size: int
-    ) -> None:
+    def train_model(model: Model, loss, x: np.ndarray, y: np.ndarray, lr: float, n_epoch: int, batch_size: int) -> None:
         idx = np.arange(batch_size, x.shape[0], batch_size)
         for _ in range(n_epoch):
             for x_batch, y_batch in zip(np.split(x, idx, axis=0), np.split(y, idx, axis=0), strict=True):
