@@ -53,7 +53,7 @@ class LogisticRegression:
             return float(np.mean(np.round(p) == y))
         y_pred = (p >= 0.5).astype(int)
         if type == "precision":
-            return float(precision_score(y, y_pred, zero_division=0.0))
+            return float(precision_score(y, y_pred, zero_division=0))
         if type == "recall":
             return float(recall_score(y, y_pred))
         if type == "F1":

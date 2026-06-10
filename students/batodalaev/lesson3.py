@@ -33,6 +33,7 @@ class LinearLayer:
         return x @ self.weights.T + self.bias
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
+        assert self._x is not None
         self._dw = dy.T @ self._x
         self._db = np.sum(dy, axis=0)
         return dy @ self.weights
@@ -55,6 +56,7 @@ class ReLULayer:
         return self._y
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
+        assert self._y is not None
         return dy * np.sign(self._y)
 
     @property
@@ -75,6 +77,7 @@ class SigmoidLayer:
         return self._y
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
+        assert self._y is not None
         return dy * self._y * (1.0 - self._y)
 
     @property
@@ -95,6 +98,7 @@ class LogSoftmaxLayer:
         return self._y
 
     def backward(self, dy: np.ndarray) -> np.ndarray:
+        assert self._y is not None
         return dy - np.exp(self._y) * np.sum(dy, axis=-1, keepdims=True)
 
     @property
@@ -133,20 +137,26 @@ class Model:
 
 
 class MSELoss:
+    _x: np.ndarray
+    _y: np.ndarray
+
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         self._x = x
         self._y = y
-        return np.mean((x - y) ** 2).astype(np.float32)
+        return np.asarray(np.mean((x - y) ** 2), dtype=np.float32)
 
     def backward(self) -> np.ndarray:
-        return (2.0 * (self._x - self._y) / self._x.size).astype(np.float32)
+        return np.asarray(2.0 * (self._x - self._y) / self._x.size, dtype=np.float32)
 
 
 class BCELoss:
+    _x: np.ndarray
+    _y: np.ndarray
+
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         self._x = x
         self._y = y
-        return np.mean(-(y * np.log(x) + (1 - y) * np.log(1 - x)))
+        return np.asarray(np.mean(-(y * np.log(x) + (1 - y) * np.log(1 - x))))
 
     def backward(self) -> np.ndarray:
         batch_size = self._x.shape[0]
@@ -154,6 +164,10 @@ class BCELoss:
 
 
 class NLLLoss:
+    _x: np.ndarray
+    _y: np.ndarray
+    _hot_y: np.ndarray
+
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         # x: log-probabilities (batch, C), y: class indices (batch,)
         self._x = x
@@ -170,6 +184,10 @@ class NLLLoss:
 
 
 class CrossEntropyLoss:
+    _logprobs: np.ndarray
+    _y: np.ndarray
+    _hot_y: np.ndarray
+
     def forward(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         # x: raw logits (batch, C), y: class indices (batch,)
         self._logprobs = _log_softmax(x)
