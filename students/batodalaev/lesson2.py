@@ -85,15 +85,11 @@ class Exercise:
         return "Lesson 2"
 
     @staticmethod
-    def create_linear_model(
-        num_features: int, rng: np.random.Generator | None = None
-    ) -> LinearRegression:
+    def create_linear_model(num_features: int, rng: np.random.Generator | None = None) -> LinearRegression:
         return LinearRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod
-    def create_logistic_model(
-        num_features: int, rng: np.random.Generator | None = None
-    ) -> LogisticRegression:
+    def create_logistic_model(num_features: int, rng: np.random.Generator | None = None) -> LogisticRegression:
         return LogisticRegression(num_features, rng or np.random.default_rng())
 
     @staticmethod

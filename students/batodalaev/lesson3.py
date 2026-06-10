@@ -27,9 +27,7 @@ class LinearLayer:
         if rng is None:
             rng = np.random.default_rng()
         k = np.sqrt(1 / in_features)
-        self.weights = rng.uniform(-k, k, (out_features, in_features)).astype(
-            np.float32
-        )
+        self.weights = rng.uniform(-k, k, (out_features, in_features)).astype(np.float32)
         self.bias = rng.uniform(-k, k, out_features).astype(np.float32)
         self._x: np.ndarray | None = None
         self._dw: np.ndarray = np.zeros_like(self.weights)
@@ -223,9 +221,7 @@ class Exercise:
         return "Lesson 3"
 
     @staticmethod
-    def create_linear_layer(
-        in_features: int, out_features: int, rng: np.random.Generator | None = None
-    ) -> LinearLayer:
+    def create_linear_layer(in_features: int, out_features: int, rng: np.random.Generator | None = None) -> LinearLayer:
         return LinearLayer(in_features, out_features, rng)
 
     @staticmethod
@@ -272,9 +268,7 @@ class Exercise:
     ) -> None:
         idx = np.arange(batch_size, x.shape[0], batch_size)
         for _ in range(n_epoch):
-            for x_batch, y_batch in zip(
-                np.split(x, idx, axis=0), np.split(y, idx, axis=0), strict=True
-            ):
+            for x_batch, y_batch in zip(np.split(x, idx, axis=0), np.split(y, idx, axis=0), strict=True):
                 loss.forward(model.forward(x_batch), y_batch)
                 model.backward(loss.backward())
                 for p, g in zip(model.parameters, model.grad, strict=True):
